@@ -75,8 +75,13 @@ for (let r = 0; r < RUNS; r++) {
       if (mx < -0.25) g.input.keys.add('KeyA');
       if (my > 0.25) g.input.keys.add('KeyS');
       if (my < -0.25) g.input.keys.add('KeyW');
-      const cluster = g.enemies.nearest(p.x + mx * 100, p.y + my * 100, 320);
-      if (cluster && frames % 120 < 60) g.input.keys.add('Space');
+      // Economy brain: hunt when healthy and prey is near; turtle up when hurt.
+      const co = g.mob.counts(0);
+      const total = co.shield + co.attack;
+      const nearFoe = g.enemies.nearest(p.x, p.y, 420);
+      const hurtBad = p.hp < p.maxHp * 0.4;
+      if (hurtBad || (!nearFoe && co.attack > 0)) g.input.keys.add('ShiftLeft');
+      else if (nearFoe && co.attack < total * 0.65) g.input.keys.add('Space');
       g.frame(1 / 60);
     } else if (g.state === 'crossroads') {
       // Random-ish picks, slight pack preference.

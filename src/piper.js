@@ -12,34 +12,19 @@ export class Piper {
     this.color = PIPER_COLORS[slot];
     this.x = x; this.y = y; this.px = x; this.py = y;
     this.speed = 175;
-    this.hearts = 3 + (little ? 2 : 0);
-    this.maxHearts = this.hearts;
+    this.maxHp = little ? 140 : 100;
+    this.hp = this.maxHp;
+    this.regen = little ? 1.6 : 1.0;   // HP per second (pauses briefly after a hit)
+    this.sinceHit = 99;
     this.invuln = 0;
     this.face = 1;
     this.walk = 0;
     this.dead = false; this.downed = false;
     this.reviveP = 0;
-    this.whistleMult = 1 + (little ? 0.2 : 0);
     this.charm = false;
-    // Rally (whistle target).
-    this.rally = { x, y };
-    this.rallyT = 0;
-    this.recallT = 0;   // "TO ME!" — mob drops everything and bodyguards you
     this.whistleAnim = 0;
-    // Trail: points every TRAIL_STEP px of movement; critters index into it.
-    this.trail = [{ x, y }];
-    this.trailDist = 0;
+    this.sendAcc = 0; this.recallAcc = 0;   // hold-to-stream send/recall
     this.magnet = little ? 150 : 95;
-  }
-
-  trailPoint(lag, side) {
-    const idx = Math.min(this.trail.length - 1, Math.floor(lag / TRAIL_STEP));
-    const p = this.trail[idx];
-    const q = this.trail[Math.min(this.trail.length - 1, idx + 1)];
-    // Perpendicular offset for a fat, organic swarm instead of a single file.
-    const dx = q.x - p.x, dy = q.y - p.y;
-    const d = Math.hypot(dx, dy) || 1;
-    return { x: p.x + (-dy / d) * side, y: p.y + (dx / d) * side };
   }
 
   update(dt, game, inp) {
@@ -57,57 +42,12 @@ export class Piper {
     const moving = inp.x !== 0 || inp.y !== 0;
     if (moving) this.walk += dt * 10;
 
-    // Trail recording.
-    const last = this.trail[0];
-    const md = Math.hypot(this.x - last.x, this.y - last.y);
-    if (md >= TRAIL_STEP) {
-      this.trail.unshift({ x: this.x, y: this.y });
-      if (this.trail.length > 420) this.trail.pop();
+    // Regen: steady trickle that pauses for 2.5s after taking a hit.
+    this.sinceHit += dt;
+    if (this.sinceHit > 2.5 && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
     }
-
-    // Whistle: hold to keep the mob rallied ahead of you.
-    if (inp.whistle) {
-      const reach = 240 * this.whistleMult;
-      let tx = this.x + (inp.x || this.face) * reach;
-      let ty = this.y + inp.y * reach;
-      // Assist: snap toward the biggest nearby bot cluster.
-      const target = game.enemies.nearest(tx, ty, 200);
-      if (target) { tx = target.x; ty = target.y; }
-      this.rally.x = clamp(tx, 34, game.arena.w - 34);
-      this.rally.y = clamp(ty, 34, game.arena.h - 34);
-      if (this.rallyT <= 0) {
-        game.audio.sfx('whistle');
-        game.fx.notes(this.x, this.y - 24, 3);
-      }
-      this.rallyT = 0.35; // refreshed while held
-      this.whistleAnim = 0.3;
-      if (Math.random() < 0.15) game.fx.notes(this.rally.x, this.rally.y - 10, 1);
-    } else if (this.rallyT > 0) {
-      this.rallyT -= dt;
-    }
-    this.recallT = Math.max(0, this.recallT - dt);
-    if (inp.recallP) {
-      // TO ME! — the mob sprints home and the arrival shoves bots away.
-      this.rallyT = 0;
-      this.recallT = 1.4;
-      game.audio.sfx('recall');
-      game.fx.ring(this.x, this.y, 90, '#aef2ff', 0.5);
-      game.fx.ring(this.x, this.y, 50, '#ffffff', 0.35);
-      game.fx.notes(this.x, this.y - 24, 6);
-      game.fx.num(this.x, this.y - 40, 'TO ME!', '#aef2ff', 16);
-      // Defensive shove: bots near the piper get pushed back.
-      // (Iterate the pool directly — the spatial grid is a frame stale.)
-      const EP = game.enemies.pool;
-      for (let i = 0; i < EP.n; i++) {
-        const e = EP.get(i);
-        if (e.dead || e.boss) continue;
-        const d = Math.hypot(e.x - this.x, e.y - this.y);
-        if (d > 120 || d < 0.01) continue;
-        e.kx += (e.x - this.x) / d * 260;
-        e.ky += (e.y - this.y) / d * 260;
-      }
-      game.shake(0.12);
-    }
+    this.whistleAnim = Math.max(0, this.whistleAnim - dt);
 
     // Charm aura (crossroads pick): nearby bots get dizzy.
     if (this.charm) {
@@ -117,29 +57,41 @@ export class Piper {
 
   hurt(game, dmg, src) {
     if (this.invuln > 0 || this.dead || this.downed) return;
-    this.hearts -= dmg;
-    this.invuln = this.little ? 1.6 : 1.0;
+    let amount = Math.max(1, Math.round(dmg * (this.little ? 0.7 : 1)));
+    this.hp -= amount;
+    this.sinceHit = 0;
+    this.invuln = this.little ? 1.1 : 0.8;
     game.audio.sfx('hurt');
     game.shake(0.3);
     game.fx.sparks(this.x, this.y, 6);
+    game.fx.num(this.x, this.y - 30, '-' + amount, '#ff6a6a', 15);
     // Make piper damage IMPOSSIBLE to miss — the piper is the loss condition.
-    game.ui.piperHit(this);
+    game.ui.piperHit(this, amount);
     if (src) {
       const dx = this.x - src.x, dy = this.y - src.y;
       const d = Math.hypot(dx, dy) || 1;
       this.x += dx / d * 14; this.y += dy / d * 14;
     }
-    if (this.hearts <= 0) {
-      this.hearts = 0;
+    if (this.hp <= 0) {
+      this.hp = 0;
       this.downed = true;
       this.reviveP = 0;
       game.onPiperDown(this);
     }
   }
 
+  heal(game, amount) {
+    if (this.dead || this.downed || this.hp >= this.maxHp) return false;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    game.fx.hearts(this.x, this.y - 20, 4);
+    game.fx.num(this.x, this.y - 34, '+' + amount, '#7ec850', 13);
+    game.audio.sfx('chime');
+    return true;
+  }
+
   revive(game) {
     this.downed = false;
-    this.hearts = Math.ceil(this.maxHearts / 2);
+    this.hp = Math.ceil(this.maxHp * 0.5);
     this.invuln = 2;
     game.audio.sfx('waveclear');
     game.fx.confetti(this.x, this.y - 10, 16);
@@ -217,17 +169,14 @@ export class Piper {
     ctx.beginPath(); ctx.ellipse(x, y + 13, 15, 6, 0, 0, 6.29); ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // Hearts float over the piper's head — health lives where the eyes are.
-    const hn = Math.min(this.maxHearts, 7);
-    const hw = hn * 9;
-    for (let h = 0; h < hn; h++) {
-      const filled = h < this.hearts;
-      const lastPulse = this.hearts === 1 && filled ? 1 + Math.sin(game.time * 10) * 0.3 : 1;
-      ctx.font = `${Math.round(9 * lastPulse)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = filled ? (this.hearts === 1 ? '#ff5c5c' : this.color) : 'rgba(20,30,15,0.45)';
-      ctx.fillText('♥', x - hw / 2 + h * 9 + 4, y - 36);
-    }
+    // HP bar floats over the piper's head — health lives where the eyes are.
+    const frac = Math.max(0, this.hp / this.maxHp);
+    const low = frac < 0.25;
+    const bw = 34, bh = 5;
+    ctx.fillStyle = 'rgba(20,30,15,0.6)';
+    ctx.fillRect(x - bw / 2 - 1, y - 40, bw + 2, bh + 2);
+    ctx.fillStyle = low ? (Math.sin(game.time * 10) > 0 ? '#ff5c5c' : '#c53030') : frac < 0.55 ? '#e8c33a' : '#7ec850';
+    ctx.fillRect(x - bw / 2, y - 39, bw * frac, bh);
     if (this.little) {
       ctx.fillStyle = '#ffd966';
       ctx.font = 'bold 10px sans-serif';
@@ -235,23 +184,6 @@ export class Piper {
       ctx.fillText('★', x + 14, y - 24);
     }
 
-    // Rally marker while whistling.
-    if (this.rallyT > 0) {
-      const t = game.time * 6;
-      ctx.strokeStyle = this.color;
-      ctx.globalAlpha = 0.7;
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([7, 7]);
-      ctx.lineDashOffset = -t * 8;
-      ctx.beginPath(); ctx.arc(this.rally.x, this.rally.y, 26 + Math.sin(t) * 4, 0, 6.29); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#fff';
-      ctx.fillText('♪', this.rally.x, this.rally.y - 32 - Math.sin(t) * 3);
-    }
   }
 }
 
-const TRAIL_STEP = 7;

@@ -43,11 +43,11 @@ export class UI {
   banner(text, color) { this.bannerData = { text, color: color || '#fff', t: 2.4, max: 2.4 }; }
 
   // Piper damage must be unmissable — the piper IS the loss condition.
-  piperHit(p) {
+  piperHit(p, amount) {
     this.dmgFlash = 0.7;
-    this.dmgMsg = p.hearts <= 0 ? `P${p.slot + 1} IS DOWN!`
-      : p.hearts === 1 ? `P${p.slot + 1}: LAST HEART!!`
-      : `P${p.slot + 1} HIT — ${p.hearts}♥ LEFT`;
+    this.dmgMsg = p.hp <= 0 ? `P${p.slot + 1} IS DOWN!`
+      : p.hp / p.maxHp < 0.25 ? `P${p.slot + 1}: -${amount} HP — DANGER!`
+      : `P${p.slot + 1}: -${amount} HP (${Math.ceil(p.hp)} left)`;
     this.heartPop = 0.5;
     if (!this.recallHintShown && this.g.mob.count() > 0) {
       this.recallHintShown = true;
@@ -271,6 +271,19 @@ export class UI {
       ctx.beginPath(); ctx.arc(x, y - 3, 3.6, Math.PI, 0); ctx.fill();
     }
 
+    // Snacks (healing apples — bots confiscate them from picnics).
+    for (const s of g.snacks) {
+      const y2 = s.y + Math.sin(s.bob) * 2;
+      ctx.fillStyle = '#e05c5c';
+      ctx.beginPath(); ctx.arc(s.x, y2, 6.5, 0, 6.29); ctx.fill();
+      ctx.fillStyle = '#ff9a9a';
+      ctx.beginPath(); ctx.arc(s.x - 2, y2 - 2, 2.2, 0, 6.29); ctx.fill();
+      ctx.strokeStyle = '#5a8a3a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(s.x, y2 - 6); ctx.quadraticCurveTo(s.x + 3, y2 - 10, s.x + 5, y2 - 9); ctx.stroke();
+      ctx.fillStyle = '#7ec850';
+      ctx.beginPath(); ctx.ellipse(s.x + 4, y2 - 9, 3, 1.8, 0.5, 0, 6.29); ctx.fill();
+    }
+
     g.enemies.renderGround(ctx);
     g.enemies.render(ctx, g.alpha, g);
     g.mob.render(ctx, g.alpha, g);
@@ -317,21 +330,33 @@ export class UI {
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     ctx.fillText(`wave ${g.waveNum}/12 · ${Math.ceil(g.waveT)}s`, VIEW_W / 2, 68);
 
-    // Piper hearts — big, labeled, and they POP when you get hit.
+    // Piper HP bars — big, labeled, they POP on damage.
     g.players.forEach((p, i) => {
-      const pop = this.heartPop > 0 ? 1 + this.heartPop * 0.6 : 1;
-      const lastBeat = p.hearts === 1 && !p.downed ? 1 + Math.sin(this.t * 10) * 0.15 : 1;
-      const hsz = 24 * pop * lastBeat;
-      const x = i === 0 ? 18 : VIEW_W - 18 - p.maxHearts * (hsz + 2);
+      const pop = this.heartPop > 0 ? 1 + this.heartPop * 0.35 : 1;
+      const bw = 190 * pop, bh = 18 * pop;
+      const x = i === 0 ? 18 : VIEW_W - 18 - bw;
+      const frac = Math.max(0, p.hp / p.maxHp);
+      const low = frac < 0.25 && !p.downed;
       ctx.font = `bold 13px ${FONT}`;
       ctx.textAlign = 'left';
       ctx.fillStyle = p.color;
-      ctx.fillText(`P${i + 1} — YOUR PIPER${p.little ? ' ★' : ''}${p.downed ? '  (DOWN!)' : ''}`, x, 18);
-      for (let h = 0; h < p.maxHearts; h++) {
-        ctx.font = `${Math.round(hsz)}px sans-serif`;
-        ctx.fillStyle = h < p.hearts ? (p.hearts === 1 ? '#ff5c5c' : p.color) : 'rgba(0,0,0,0.32)';
-        ctx.fillText('♥', x + h * (hsz + 2), 42);
-      }
+      ctx.fillText(`P${i + 1} — YOUR PIPER${p.little ? ' ★' : ''}${p.downed ? '  (DOWN!)' : ''}`, x, 16);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      rr(ctx, x, 22, bw, bh, 6); ctx.fill();
+      ctx.fillStyle = low ? (Math.sin(this.t * 10) > 0 ? '#ff5c5c' : '#b53030') : frac < 0.55 ? '#e8c33a' : '#7ec850';
+      if (frac > 0) { rr(ctx, x, 22, Math.max(8, bw * frac), bh, 6); ctx.fill(); }
+      ctx.font = `bold 12px ${FONT}`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.ceil(p.hp)} / ${p.maxHp}`, x + bw / 2, 35);
+      // Shield vs hunters readout for this piper.
+      const co = g.mob.counts(p.slot);
+      ctx.textAlign = 'left';
+      ctx.font = `bold 14px ${FONT}`;
+      ctx.fillStyle = '#aef2ff';
+      ctx.fillText(`🛡 ${co.shield}`, x, 60);
+      ctx.fillStyle = '#ff9a6a';
+      ctx.fillText(`⚔ ${co.attack}`, x + 64, 60);
     });
 
     // Damage flash: red vignette + center callout. Nobody misses this now.
@@ -351,7 +376,7 @@ export class UI {
       ctx.fillText(this.dmgMsg, VIEW_W / 2, VIEW_H * 0.22);
     }
     // Persistent last-heart heartbeat vignette.
-    const dying = g.players.find(p => !p.dead && !p.downed && p.hearts === 1);
+    const dying = g.players.find(p => !p.dead && !p.downed && p.hp / p.maxHp < 0.25);
     if (dying && this.dmgFlash <= 0) {
       const pulse = (Math.sin(this.t * 6) + 1) / 2;
       const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.78);
@@ -368,7 +393,7 @@ export class UI {
       ctx.fillStyle = `rgba(174,242,255,${blink})`;
       ctx.strokeStyle = 'rgba(20,40,50,0.8)';
       ctx.lineWidth = 5;
-      const msg = `press ${g.input.glyph(0, 'recall')} — TO ME! your mob rushes back to protect you`;
+      const msg = `hold ${g.input.glyph(0, 'recall')} — call your hunters back to SHIELD you!`;
       ctx.strokeText(msg, VIEW_W / 2, VIEW_H * 0.3);
       ctx.fillText(msg, VIEW_W / 2, VIEW_H * 0.3);
     }
@@ -421,15 +446,17 @@ export class UI {
     }
 
     // Staged wave-1 coaching: one idea at a time.
-    if (g.waveNum === 1 && g.runStats.time < 16) {
+    if (g.waveNum === 1 && g.runStats.time < 17) {
       ctx.font = `bold 17px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = `rgba(255,255,255,${0.65 + Math.sin(this.t * 4) * 0.3})`;
       ctx.strokeStyle = 'rgba(30,45,20,0.7)';
       ctx.lineWidth = 5;
-      const msg = g.runStats.time < 7
-        ? 'walk around — your mob follows YOUR path!'
-        : `hold ${g.input.glyph(0, 'whistle')} to SEND the mob at the robots!`;
+      const msg = g.runStats.time < 6
+        ? 'your critters circle you — they are your SHIELD!'
+        : g.runStats.time < 11
+        ? `tap ${g.input.glyph(0, 'whistle')} — send ONE critter out to attack!`
+        : `tap ${g.input.glyph(0, 'recall')} to call one back. Balance shield vs attack!`;
       ctx.strokeText(msg, VIEW_W / 2, VIEW_H - 70);
       ctx.fillText(msg, VIEW_W / 2, VIEW_H - 70);
     }
@@ -637,10 +664,10 @@ export class UI {
       // Say exactly WHY the run ended and what to do about it.
       ctx.font = `bold 19px ${FONT}`;
       ctx.fillStyle = '#fff';
-      this.wrap(ctx, 'Your hearts ♥ ran out — the mob only marches for a standing piper.', VIEW_W / 2, 190, 700, 24);
+      this.wrap(ctx, 'Your HP hit zero — the mob only marches for a standing piper.', VIEW_W / 2, 190, 700, 24);
       ctx.font = `16px ${FONT}`;
       ctx.fillStyle = '#c8e0b8';
-      this.wrap(ctx, `Next run: keep the robots off YOU. Whistle (${g.input.glyph(0, 'whistle')}) sends the mob at them; TO ME! (${g.input.glyph(0, 'recall')}) calls everyone back as bodyguards.`, VIEW_W / 2, 220, 720, 21);
+      this.wrap(ctx, `Next run: keep more critters on SHIELD duty (${g.input.glyph(0, 'recall')} recalls hunters), grab snack drops to heal, and stand still a moment to regenerate.`, VIEW_W / 2, 220, 720, 21);
     }
     ctx.font = `italic 17px ${FONT}`;
     ctx.fillStyle = '#e8e0d0';

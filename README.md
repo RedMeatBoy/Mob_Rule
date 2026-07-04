@@ -21,17 +21,19 @@ believe animals are clutter. Prove them extremely wrong.
 | Action | Keyboard P1 | Keyboard P2 | Xbox |
 |---|---|---|---|
 | Walk | `WASD` | Arrows | Left stick |
-| **Whistle** (hold — sends the mob ahead) | `Space` | `Enter` | **A** |
-| **TO ME!** (mob rushes back to defend you) | `Shift` | `RShift` | **B** |
+| **SEND** one critter to attack (hold = stream) | `Space` | `Enter` | **A** |
+| **RECALL** one to your shield (hold = all) | `Shift` | `RShift` | **B** |
 | Pause | `Esc` | `Esc` | **Start** |
 | Mute | `M` | `M` | **View** |
 
-That's it. The mob follows your footsteps and fights automatically.
+That's it — but the heart of the game is the **attack-vs-shield economy**:
+your critters orbit you as a living shield. Every critter you SEND out is a
+hunter that fights for you — and one less body between you and the robots.
+Balance it in real time: turtle up when swarmed, unleash when it's safe.
 
-**⚠️ YOU are the health bar.** The robots win by bonking the *piper*, not the
-mob — so keep them off you. Whistle sends your swarm at them; **TO ME!** pulls
-everyone back around you as bodyguards (with a shove for anything too close).
-Walk over **cages** to free recruits, and never stop moving.
+**⚠️ YOU are the health bar (100 HP).** You regenerate slowly, apples heal
++25, and shield critters nibble anything that breaches the wall. Walk over
+**cages** to free recruits, and never stop moving.
 
 ## 🐾 The rules of the mob
 

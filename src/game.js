@@ -45,6 +45,7 @@ export class Game {
     this.acornsList = new Pool(() => ({ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, val: 1, bob: 0 }));
     this.cages = [];
     this.clouds = [];
+    this.snacks = [];
     this.rng = Math.random;
 
     this.save = this.load();
@@ -81,7 +82,7 @@ export class Game {
     this.mob = new MobSystem();
     this.enemies.clear();
     this.proj.clear(); this.acornsList.clear();
-    this.cages.length = 0; this.clouds.length = 0;
+    this.cages.length = 0; this.clouds.length = 0; this.snacks.length = 0;
     this.fx.clear();
     this.runStats = { bots: 0, acorns: 0, time: 0 };
     this.boss = null;
@@ -220,9 +221,9 @@ export class Game {
       this.mob.buffs[c.stat] += c.amount;
       this.fx.num(p.x, p.y - 30, c.title + '!', '#ffd166', 14);
     } else if (c.kind === 'piperBuff') {
-      if (c.stat === 'heart') { p.maxHearts++; p.hearts = p.maxHearts; }
+      if (c.stat === 'maxhp') { p.maxHp += c.amount; p.hp = p.maxHp; }
       else if (c.stat === 'speed') p.speed *= (1 + c.amount);
-      else if (c.stat === 'whistle') p.whistleMult += c.amount;
+      else if (c.stat === 'regen') p.regen += c.amount;
       else if (c.stat === 'charm') p.charm = true;
       this.fx.num(p.x, p.y - 30, c.title + '!', '#7ec850', 14);
     } else if (c.kind === 'wild') {
@@ -254,6 +255,32 @@ export class Game {
   skunkCloud(x, y, r, dmg, tier) {
     this.clouds.push({ x, y, r, dmg, life: 2.2 + tier * 0.4, tickT: 0 });
   }
+  dropSnack(x, y) {
+    if (this.snacks.length > 12) return;
+    this.snacks.push({ x, y, bob: Math.random() * 6 });
+  }
+
+  updateSnacks(dt) {
+    for (let i = this.snacks.length - 1; i >= 0; i--) {
+      const s = this.snacks[i];
+      s.bob += dt * 4;
+      for (const p of this.players) {
+        if (p.dead || p.downed) continue;
+        const d2 = dist2(s.x, s.y, p.x, p.y);
+        // Only sticks to a piper who needs it — full pipers leave it for later.
+        if (p.hp < p.maxHp && d2 < p.magnet * p.magnet) {
+          const d = Math.sqrt(d2) || 1;
+          s.x += (p.x - s.x) / d * 500 * dt;
+          s.y += (p.y - s.y) / d * 500 * dt;
+        }
+        if (d2 < 22 * 22 && p.heal(this, 25)) {
+          this.snacks.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+
   dropAcorn(x, y, val) {
     const a = this.acornsList.alloc();
     a.x = a.px = x; a.y = a.py = y;
@@ -308,14 +335,31 @@ export class Game {
       }
     }
 
-    // Players.
+    // Players + the attack/shield economy: tap sends/recalls ONE, hold streams.
     for (const p of this.players) {
       const inp = this.input.move(p.slot);
-      p.update(dt, this, {
-        x: inp.x, y: inp.y,
-        whistle: this.input.down(p.slot, 'whistle'),
-        recallP: this.input.pressed(p.slot, 'recall'),
-      });
+      p.update(dt, this, { x: inp.x, y: inp.y });
+      if (p.dead || p.downed) continue;
+      if (this.input.pressed(p.slot, 'whistle')) {
+        if (this.mob.sendOne(this, p)) { p.whistleAnim = 0.3; this.fx.notes(p.x, p.y - 24, 2); }
+        p.sendAcc = -0.25; // grace before the hold-stream kicks in
+      } else if (this.input.down(p.slot, 'whistle')) {
+        p.sendAcc += dt;
+        while (p.sendAcc >= 0.14) {
+          p.sendAcc -= 0.14;
+          if (this.mob.sendOne(this, p)) p.whistleAnim = 0.3;
+        }
+      } else p.sendAcc = 0;
+      if (this.input.pressed(p.slot, 'recall')) {
+        this.mob.recallOne(this, p);
+        p.recallAcc = -0.25;
+      } else if (this.input.down(p.slot, 'recall')) {
+        p.recallAcc += dt;
+        while (p.recallAcc >= 0.11) {
+          p.recallAcc -= 0.11;
+          this.mob.recallOne(this, p);
+        }
+      } else p.recallAcc = 0;
     }
     // Revive downed partner by proximity.
     for (const p of this.players) {
@@ -333,6 +377,7 @@ export class Game {
     this.updateProjectiles(dt);
     this.updateClouds(dt);
     this.updateAcorns(dt);
+    this.updateSnacks(dt);
     this.updateCages(dt);
     this.fx.update(dt);
     this.updateCamera(dt);
@@ -386,7 +431,7 @@ export class Game {
         if (!hit) {
           for (const p of this.players) {
             if (p.dead || p.downed) continue;
-            if (dist2(pr.x, pr.y, p.x, p.y) < 15 * 15) { p.hurt(this, 1, pr); hit = true; }
+            if (dist2(pr.x, pr.y, p.x, p.y) < 15 * 15) { p.hurt(this, pr.dmg * 4 + 4, pr); hit = true; }
           }
         }
         if (hit) P.release(i);

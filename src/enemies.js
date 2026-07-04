@@ -88,6 +88,9 @@ export class EnemySystem {
     game.fx.botScrap(e.x, e.y, 8 + (e.boss ? 24 : 0));
     game.audio.sfx('botdie');
     game.runStats.bots++;
+    // Sometimes a snack falls out (the bots confiscated them from picnics).
+    if (Math.random() < 0.09 && !e.boss) game.dropSnack(e.x, e.y);
+    if (e.boss) { game.dropSnack(e.x - 20, e.y); game.dropSnack(e.x + 20, e.y); }
     // Acorns!
     const n = e.def.xp;
     for (let i = 0; i < Math.min(n, 6); i++) {
@@ -162,7 +165,7 @@ export class EnemySystem {
           for (const p of game.players) {
             if (p.dead || p.downed) continue;
             if (dist2(e.x, e.y, p.x, p.y) < (e.size + 12) * (e.size + 12)) {
-              p.hurt(game, 1, e);
+              p.hurt(game, e.dmg * 6, e);
               hitSomething = true;
             }
           }
@@ -261,7 +264,7 @@ export class EnemySystem {
             }
           });
           for (const p of game.players) {
-            if (!p.dead && !p.downed && dist2(e.x, e.y, p.x, p.y) < e.def.sweepRange * e.def.sweepRange) p.hurt(game, 1, e);
+            if (!p.dead && !p.downed && dist2(e.x, e.y, p.x, p.y) < e.def.sweepRange * e.def.sweepRange) p.hurt(game, e.dmg * 6, e);
           }
         }
         e.atk = Math.max(0, e.atk - dt);
@@ -415,7 +418,7 @@ export class EnemySystem {
           if (!c.bagged && dist2(e.x, e.y, c.x, c.y) < 190 * 190) game.mob.hurt(game, c, e.dmg, e);
         });
         for (const p of game.players) {
-          if (!p.dead && !p.downed && dist2(e.x, e.y, p.x, p.y) < 190 * 190) p.hurt(game, 1, e);
+          if (!p.dead && !p.downed && dist2(e.x, e.y, p.x, p.y) < 190 * 190) p.hurt(game, 20, e);
         }
         e.state = 'move'; e.t1 = 3.2 * cd;
       }

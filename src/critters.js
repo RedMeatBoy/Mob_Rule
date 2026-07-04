@@ -1,13 +1,15 @@
-// critters.js — THE MOB. Critters follow the path their piper walked (a
-// living conga-swarm), fight automatically by role, and auto-merge 3 → 1
-// evolved. The mob is the health bar, the weapon, and the progression.
+// critters.js — THE MOB, now an ATTACK-vs-SHIELD economy. Shield critters
+// orbit the piper as a living wall (they nibble what gets close and soak
+// incoming fire). Send one out (Space) and it hunts freely — but that is one
+// less body between you and the Tidy Empire. Recall (Shift) brings hunters
+// home one at a time. Merges still rule everything.
 
 import { Pool, Grid, clamp, lerp, dist2, randRange, makeSprite } from './pool.js';
 import { SPECIES, TIER_MULT, MOB_CAP, MERGE_LINES } from './data.js';
 
-const AGGRO = 150;         // enemies this close to a critter get attacked
-const LEASH = 420;         // farther than this from the piper: come home
-const SENT_AGGRO = 240;    // aggro radius around a whistle rally point
+const HUNT_RANGE = 800;    // hunters chase anything this close to them
+const NIBBLE_RANGE = 78;   // shield critters bite what breaches the wall
+const RING_CAPS = [10, 16, 22, 28, 40];
 
 export function statFor(sp, tier, key) {
   const base = SPECIES[sp][key] || 0;
@@ -46,7 +48,7 @@ export class MobSystem {
       sp, tier: tier || 1,
       x, y, px: x, py: y, vx: 0, vy: 0,
       hp: this.maxHp(sp, tier || 1), owner: owner || 0,
-      state: 'follow', target: null,
+      duty: 'shield', target: null,
       atkT: randRange(0, 0.4), cdT: 0,
       lag: 12 + this.list.length * 2.2 + randRange(0, 10),
       side: randRange(-16, 16),
@@ -130,15 +132,130 @@ export class MobSystem {
     }
   }
 
+  // Ring slot for shield critter #i of n: concentric orbits around the piper.
+  orbitSlot(i, n, t) {
+    let ring = 0, base = 0;
+    while (ring < RING_CAPS.length - 1 && i >= base + Math.min(RING_CAPS[ring], n - base)) {
+      base += RING_CAPS[ring]; ring++;
+    }
+    const inRing = Math.min(RING_CAPS[ring], Math.max(1, n - base));
+    const j = i - base;
+    const dir = ring % 2 ? -1 : 1;
+    const ang = (j / inRing) * 6.2832 + t * (0.75 - ring * 0.12) * dir + ring * 0.55;
+    return { r: 46 + ring * 30, ang };
+  }
+
+  // Shield critters fight without leaving their post.
+  attackInPlace(c, def, game, size) {
+    const t = game.enemies.nearest(c.x, c.y, NIBBLE_RANGE + (def.role === 'ranged' || def.role === 'homing' ? 60 : 0));
+    if (!t) return;
+    c.face = t.x > c.x ? 1 : -1;
+    if (def.role === 'aoe') {
+      if (c.cdT <= 0 && Math.hypot(t.x - c.x, t.y - c.y) < def.radius) {
+        c.cdT = def.cooldown;
+        game.skunkCloud(c.x, c.y, def.radius * (1 + (c.tier - 1) * 0.25), this.dmgOf(c), c.tier);
+        game.audio.sfx('pfft');
+        c.squash = 0.6;
+      }
+      return;
+    }
+    if (c.atkT > 0) return;
+    if (def.role === 'ranged' || def.role === 'homing') {
+      c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+      c.squash = 0.5;
+      game.spawnProj(c.x, c.y - 6, t, this.dmgOf(c), def.role === 'homing', SPECIES[c.sp].accent);
+      if (Math.random() < 0.4) game.audio.sfx(def.sound);
+    } else {
+      const reach = t.size + size * 0.8 + 10;
+      if (Math.hypot(t.x - c.x, t.y - c.y) < reach) {
+        c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+        c.squash = 0.6;
+        game.enemies.hurt(game, t, this.dmgOf(c), c, {});
+        if (Math.random() < 0.25) game.audio.sfx(def.sound);
+      }
+    }
+  }
+
+  healInPlace(c, def, game) {
+    if (c.atkT > 0) return;
+    const amt = statFor(c.sp, c.tier, 'heal');
+    let healed = 0;
+    for (const o of this.list) {
+      if (healed >= 3 || o === c || o.bagged) continue;
+      if (dist2(c.x, c.y, o.x, o.y) < def.radius * def.radius) {
+        const max = this.maxHp(o.sp, o.tier);
+        if (o.hp < max) {
+          o.hp = Math.min(max, o.hp + amt);
+          game.fx.hearts(o.x, o.y - 10, 1);
+          healed++;
+        }
+      }
+    }
+    if (healed) {
+      c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+      c.squash = 0.4;
+      game.audio.sfx('chime');
+    }
+  }
+
+  // Send one shield critter out to hunt (Space press). Returns it, or null.
+  sendOne(game, piper) {
+    const shields = this.list.filter(c => !c.bagged && !c._gone && c.duty === 'shield' && c.owner === piper.slot);
+    if (!shields.length) return null;
+    const foe = game.enemies.nearest(piper.x, piper.y, 900);
+    let best = shields[0], bd = Infinity;
+    for (const c of shields) {
+      const d = foe ? dist2(c.x, c.y, foe.x, foe.y) : dist2(c.x, c.y, piper.x + piper.face * 120, piper.y);
+      if (d < bd) { bd = d; best = c; }
+    }
+    best.duty = 'attack';
+    best.target = null;
+    game.fx.ring(best.x, best.y, 20, '#ff9a6a', 0.3);
+    game.audio.sfx('whistle');
+    game.audio.sfx(SPECIES[best.sp].sound);
+    return best;
+  }
+
+  // Bring one hunter home (Shift press). Returns it, or null.
+  recallOne(game, piper) {
+    const hunters = this.list.filter(c => !c.bagged && !c._gone && c.duty === 'attack' && c.owner === piper.slot);
+    if (!hunters.length) return null;
+    let best = hunters[0], bd = Infinity;
+    for (const c of hunters) {
+      const d = dist2(c.x, c.y, piper.x, piper.y);
+      if (d < bd) { bd = d; best = c; }
+    }
+    best.duty = 'shield';
+    best.target = null;
+    game.fx.ring(best.x, best.y, 20, '#aef2ff', 0.3);
+    game.audio.sfx('recall');
+    return best;
+  }
+
+  counts(owner) {
+    let shield = 0, attack = 0;
+    for (const c of this.list) {
+      if (c.bagged || c._gone) continue;
+      if (owner != null && c.owner !== owner) continue;
+      if (c.duty === 'attack') attack++; else shield++;
+    }
+    return { shield, attack };
+  }
+
   update(dt, game) {
     this.time += dt;
     this.grid.clear();
     for (const c of this.list) this.grid.insert(c.x, c.y, c);
 
+    // Shield slot pre-pass: stable indices per owner.
+    const shieldTotals = [0, 0];
+    for (const c of this.list) {
+      if (!c.bagged && !c._gone && c.duty === 'shield') shieldTotals[c.owner] = (shieldTotals[c.owner] || 0) + 1;
+    }
+    const slotCursor = [0, 0];
+
     for (let i = this.list.length - 1; i >= 0; i--) {
       const c = this.list[i];
-      // Merges triggered mid-pass (boss drops, bunny breeding) can shrink the
-      // list at arbitrary indices — guard both the hole and stale entries.
       if (!c || c._gone || c.bagged) continue;
       c.px = c.x; c.py = c.y;
       c.wob += dt * 8;
@@ -154,60 +271,38 @@ export class MobSystem {
       const def = SPECIES[c.sp];
       const spd = statFor(c.sp, c.tier, 'speed') * (1 + this.buffs.speed);
 
-      // ---- TO ME! overrides everything: sprint home, guard the piper ----
-      let recalled = false;
-      if (piper.recallT > 0) {
-        recalled = true;
-        c.target = null;
-        const dx = piper.x - c.x, dy = piper.y - c.y;
+      if (c.duty === 'shield') {
+        // Hold the wall: orbit the piper, bite what breaches it.
+        const idx = slotCursor[c.owner]++;
+        const slot = this.orbitSlot(idx, Math.max(1, shieldTotals[c.owner] || 1), this.time);
+        const tx = piper.x + Math.cos(slot.ang) * slot.r;
+        const ty = piper.y + Math.sin(slot.ang) * slot.r;
+        const dx = tx - c.x, dy = ty - c.y;
         const d = Math.hypot(dx, dy);
-        if (d > 34) {
-          c.vx = (dx / d) * spd * 1.9;
-          c.vy = (dy / d) * spd * 1.9;
-        } else { c.vx *= 0.7; c.vy *= 0.7; }
-      }
-
-      // ---- target acquisition ----
-      const sent = !recalled && piper.rallyT > 0;
-      const anchor = sent ? piper.rally : { x: c.x, y: c.y };
-      const seekR = sent ? SENT_AGGRO : AGGRO;
-      if (!recalled) {
-        if (!c.target || c.target.dead) {
-          c.target = null;
-          if (def.role !== 'heal') {
-            c.target = game.enemies.nearest(anchor.x, anchor.y, seekR)
-              || (sent ? game.enemies.nearest(c.x, c.y, AGGRO) : null);
-          }
-        } else if (!sent && dist2(c.target.x, c.target.y, piper.x, piper.y) > LEASH * LEASH) {
-          c.target = null; // don't chase to the next county
-        }
-      }
-
-      // ---- role behaviors ----
-      let moved = recalled;
-      if (!recalled) {
-        if (def.role === 'heal') {
-          moved = this.behaveHealer(c, dt, game, piper, spd);
-        } else if (c.target) {
-          moved = this.behaveCombat(c, dt, game, def, spd);
-        }
-      }
-
-      if (!moved) {
-        // FOLLOW: trail of the piper — the conga line that makes it alive.
-        const pt = piper.trailPoint(c.lag, c.side);
-        const dx = pt.x - c.x, dy = pt.y - c.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 6) {
-          const rush = sent ? 1.35 : d > 120 ? 1.5 : 1;
+        if (d > 8) {
+          const rush = d > 120 ? 1.9 : 1.25;
           c.vx = (dx / d) * spd * rush;
           c.vy = (dy / d) * spd * rush;
-        } else { c.vx *= 0.8; c.vy *= 0.8; }
-        if (sent) {
-          // Whistled: surge toward the rally point instead.
-          const rx = piper.rally.x + c.side * 1.5, ry = piper.rally.y + (c.lag % 60) - 30;
-          const rd = Math.hypot(rx - c.x, ry - c.y);
-          if (rd > 14) { c.vx = (rx - c.x) / rd * spd * 1.4; c.vy = (ry - c.y) / rd * spd * 1.4; }
+        } else { c.vx *= 0.7; c.vy *= 0.7; }
+        if (def.role === 'heal') this.healInPlace(c, def, game);
+        else this.attackInPlace(c, def, game, statFor(c.sp, c.tier, 'size'));
+      } else {
+        // Hunter: seek and destroy, freely.
+        let moved = false;
+        if (def.role === 'heal') {
+          moved = this.behaveHealer(c, dt, game, piper, spd);
+        } else {
+          if (!c.target || c.target.dead) c.target = game.enemies.nearest(c.x, c.y, HUNT_RANGE);
+          if (c.target) moved = this.behaveCombat(c, dt, game, def, spd);
+        }
+        if (!moved) {
+          // No prey: prowl a wide ring, visibly "out" and ready.
+          const ang = this.time * 1.1 + c.lag * 0.13;
+          const tx = piper.x + Math.cos(ang) * 150;
+          const ty = piper.y + Math.sin(ang) * 150;
+          const d = Math.hypot(tx - c.x, ty - c.y);
+          if (d > 12) { c.vx = (tx - c.x) / d * spd; c.vy = (ty - c.y) / d * spd; }
+          else { c.vx *= 0.8; c.vy *= 0.8; }
         }
       }
 
@@ -432,6 +527,15 @@ export class MobSystem {
         ctx.fillStyle = '#fff';
         ctx.beginPath(); ctx.arc(x, y + hop, size, 0, 6.29); ctx.fill();
         ctx.globalAlpha = 1;
+      }
+      if (c.duty === 'attack') {
+        // Little red bandana: this one is on the hunt.
+        ctx.fillStyle = '#e05c5c';
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y + hop - size - 2);
+        ctx.lineTo(x + 4, y + hop - size - 2);
+        ctx.lineTo(x, y + hop - size + 4);
+        ctx.closePath(); ctx.fill();
       }
       if (c.crowned) drawCrown(ctx, x, y + hop - size - 6, size * 0.7);
       if (c.tier === 3) { // kings sparkle

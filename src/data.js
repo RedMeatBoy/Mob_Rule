@@ -178,9 +178,9 @@ export const CHOICES = [
   { id: 'buff_atkspd', kind: 'mobBuff', stat: 'atkspd', amount: 0.12, icon: 'bolt', title: 'Caffeinated Mob', desc: 'Mob attack speed +12%' },
   { id: 'buff_crit', kind: 'mobBuff', stat: 'crit', amount: 0.08, icon: 'burst', title: 'Wild Swings', desc: '+8% chance of DOUBLE damage' },
 
-  { id: 'piper_heart', kind: 'piperBuff', stat: 'heart', icon: 'heart', title: 'Second Wind', desc: '+1 heart (and heal up!)' },
+  { id: 'piper_heart', kind: 'piperBuff', stat: 'maxhp', amount: 25, icon: 'heart', title: 'Second Wind', desc: '+25 Max HP, and heal up!' },
   { id: 'piper_speed', kind: 'piperBuff', stat: 'speed', amount: 0.12, icon: 'wind', title: 'Marching Boots', desc: 'Piper speed +12%' },
-  { id: 'piper_whistle', kind: 'piperBuff', stat: 'whistle', amount: 0.3, icon: 'note', title: 'Louder Whistle', desc: 'Send range +30%' },
+  { id: 'piper_regen', kind: 'piperBuff', stat: 'regen', amount: 1, icon: 'heart', title: 'Healing Hum', desc: '+1 HP regen every second' },
   { id: 'piper_charm', kind: 'piperBuff', stat: 'charm', icon: 'swirl', title: 'Charming Tune', desc: 'Bots near you get dizzy (slowed)' },
 
   { id: 'wild_bunnies', kind: 'wild', effect: 'bunnyBreed', icon: 'bunny', title: 'Spring Time', desc: 'Bunnies occasionally make MORE bunnies', needsUnlock: 'bunny' },
@@ -210,8 +210,10 @@ export const VICTORY_LINES = [
 export const TIPS = [
   'Critters follow the path YOU walk. Loop around enemies to surround them!',
   'Whistle (hold it!) to send the mob ahead. Let go and they come home.',
-  'Robots chasing YOU? Press TO ME! — the whole mob rushes back as bodyguards.',
-  'YOU are the health bar. If the piper falls, the parade is over.',
+  'Your mob circles you as a SHIELD. Tap Space to send ONE out hunting.',
+  'Hold Shift to pull hunters back when the robots get pushy.',
+  'YOU are the health bar (100 HP). Snacks heal 25. Standing still regens.',
+  'More shields = safer piper. More hunters = faster kills. Choose!',
   'Three of the same critter MERGE into something bigger. Collect triples!',
   'Cages hold recruits. Walk over them. Free the friends.',
   'Bag-Bots steal critters — pop the bot, get your friend back.',

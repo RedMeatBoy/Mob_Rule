@@ -4,14 +4,79 @@
 
 function nf(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 
-// A cheerful two-chord march in G: G — C, with a fife-y melody.
-const MARCH = {
-  stepDur: 0.16,
-  bass: [43, null, 50, null, 43, null, 50, null, 48, null, 55, null, 48, null, 55, null],
-  mel:  [67, 69, 71, null, 74, null, 71, 69, 72, null, 76, 74, 72, null, 71, null],
-  mel2: [null, null, null, 79, null, 78, null, null, null, 79, null, null, null, 81, null, 79],
-  hat:  [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+// ---- The soundtrack: three real songs (30s+ each), rotated every ~2 min ----
+// Songs are authored as 2-bar melody PHRASES concatenated into a full
+// arrangement, with a chord progression driving the bass. Verse/chorus
+// structure keeps a 30-50 second loop from wearing out its welcome.
+
+const P = (...xs) => xs; // phrase helper
+function flat(...phrases) { return [].concat(...phrases); }
+
+// --- Song 1: "Meadow March" — G major, the parade classic, ~31s ---
+const M_V1 = P(67, 69, 71, null, 74, null, 71, 69, 72, null, 71, 69, 67, null, null, null);
+const M_V2 = P(67, 69, 71, null, 74, null, 76, 74, 72, 74, 72, 69, 67, null, null, null);
+const M_C1 = P(76, null, 74, 72, 74, null, 72, 71, 72, null, 74, 76, 74, null, 71, null);
+const M_C2 = P(76, null, 74, 72, 74, null, 76, 79, 78, 76, 74, 72, 71, null, 67, null);
+const SONG_MARCH = {
+  name: 'Meadow March', stepDur: 0.16, spb: 8,
+  // 24 bars: verse(8) chorus(8) verse(8). Bass roots per bar (MIDI).
+  bassBars: flat(
+    P(43, 43, 48, 48, 43, 43, 50, 50),   // G G C C G G D D
+    P(40, 40, 48, 48, 43, 43, 50, 50),   // Em Em C C G G D D
+    P(43, 43, 48, 48, 43, 43, 50, 43),
+  ),
+  mel: flat(M_V1, M_V2, M_V1, M_V2, M_C1, M_C2, M_C1, M_C2, M_V1, M_V2, M_V1, M_V2),
+  bassPat: [0, null, 7, null, 0, null, 7, null], // offsets from bar root
+  kick: [1, 0, 0, 0, 1, 0, 0, 0],
+  snare: [0, 0, 0, 0, 1, 0, 0, 0],
+  hat: [0, 1, 0, 1, 0, 1, 0, 1],
+  melVol: 0.10, melType: 'square', bassVol: 0.32,
 };
+
+// --- Song 2: "Puddle Parade" — C major, faster and bouncier, ~36s ---
+const D_P1 = P(72, null, 76, null, 74, 72, 69, null, 71, null, 74, null, 72, null, null, null);
+const D_P2 = P(72, null, 76, null, 79, null, 76, 74, 72, 74, 71, 69, 67, null, null, null);
+const D_P3 = P(77, null, 76, 74, 72, null, 74, null, 71, 72, 74, null, 79, null, null, null);
+const D_P4 = P(84, null, 83, 81, 79, null, 76, null, 77, 76, 74, 72, 71, 72, null, null);
+const SONG_PARADE = {
+  name: 'Puddle Parade', stepDur: 0.14, spb: 8,
+  bassBars: flat(
+    P(48, 45, 41, 43, 48, 45, 41, 43),   // C Am F G ×2
+    P(41, 41, 43, 43, 48, 45, 41, 43),   // F F G G C Am F G
+    P(48, 45, 41, 43, 48, 43, 48, 48),
+    P(41, 43),                            // turnaround
+  ),
+  mel: flat(D_P1, D_P2, D_P1, D_P2, D_P3, D_P4, D_P1, D_P2, D_P3, D_P4, D_P1, D_P2, D_P3.slice(0, 16)),
+  bassPat: [0, null, 12, null, 0, null, 12, 7],
+  kick: [1, 0, 0, 1, 0, 0, 1, 0],
+  snare: [0, 0, 1, 0, 0, 0, 1, 0],
+  hat: [1, 1, 0, 1, 1, 0, 1, 1],
+  melVol: 0.10, melType: 'triangle', bassVol: 0.30,
+};
+
+// --- Song 3: "Waltz of the Frog King" — A minor, stately 3/4, ~34s ---
+const W_1 = P(69, null, 72, null, 71, null, 72, null, 74, null, 72, null);
+const W_2 = P(76, null, 74, null, 72, null, 71, null, 69, null, null, null);
+const W_3 = P(72, null, 76, null, 79, null, 76, null, 74, null, 72, null);
+const W_4 = P(71, null, 68, null, 64, null, 69, null, null, null, null, null);
+const SONG_WALTZ = {
+  name: 'Waltz of the Frog King', stepDur: 0.2, spb: 6,
+  bassBars: flat(
+    P(45, 45, 41, 41, 48, 48, 40, 40),   // Am Am F F C C E E
+    P(45, 45, 41, 41, 48, 48, 40, 40),
+    P(45, 41, 48, 40, 45, 41, 40, 45),
+  ),
+  mel: flat(W_1, W_2, W_3, W_4, W_1, W_2, W_3, W_4, W_1, W_3, W_2, W_4),
+  bassPat: [0, null, null, null, null, null],   // oom (stabs handled below)
+  waltzStab: [null, null, 1, null, 1, null],    // pah pah on 2 & 3
+  kick: [1, 0, 0, 0, 0, 0],
+  snare: [0, 0, 0, 0, 0, 0],
+  hat: [0, 0, 1, 0, 1, 0],
+  melVol: 0.11, melType: 'triangle', bassVol: 0.34,
+};
+
+const SONGS = [SONG_MARCH, SONG_PARADE, SONG_WALTZ];
+const SONG_ROTATE_SEC = 120; // switch songs every ~2 minutes (at a song boundary)
 
 export class AudioSystem {
   constructor() {
@@ -63,11 +128,13 @@ export class AudioSystem {
     s.start(t); s.stop(t + dur + 0.02);
   }
 
-  // ---- music ----
+  // ---- music: song rotation with a lookahead scheduler ----
   startMusic() {
     if (!this.ctx || this.playing) return;
     this.playing = true;
     this.beat = 0;
+    this.songT = 0;
+    if (this.songIdx == null) this.songIdx = Math.floor(Math.random() * SONGS.length);
     this.nextT = this.ctx.currentTime + 0.05;
     if (this.interval) clearInterval(this.interval);
     this.interval = setInterval(() => this.pump(), 25);
@@ -78,16 +145,45 @@ export class AudioSystem {
   }
   pump() {
     if (!this.playing || this.muted) { if (this.ctx) this.nextT = Math.max(this.nextT, this.ctx.currentTime + 0.1); return; }
+    const song = SONGS[this.songIdx % SONGS.length];
+    const totalSteps = song.mel.length;
     while (this.nextT < this.ctx.currentTime + 0.15) {
-      const s = this.beat % 16;
       const t = this.nextT;
-      if (MARCH.bass[s] != null) this.tone(nf(MARCH.bass[s]), t, 0.14, 'triangle', 0.34, this.musicGain);
-      if (MARCH.mel[s] != null) this.tone(nf(MARCH.mel[s]), t, 0.15, 'square', 0.10, this.musicGain, 0, 12);
-      if (this.intensity > 0.5 && MARCH.mel2[s] != null) this.tone(nf(MARCH.mel2[s]), t, 0.13, 'square', 0.07, this.musicGain, 0, 14);
-      if (MARCH.hat[s]) this.nz(t, 0.03, 0.05, 7000);
-      if (s === 0 || s === 8) this.tone(58, t, 0.12, 'sine', 0.3, this.musicGain, 40);
+      const step = this.beat % totalSteps;
+      const bar = Math.floor(step / song.spb) % song.bassBars.length;
+      const s = step % song.spb;
+      const root = song.bassBars[bar];
+
+      // Bass (+ waltz oom-pah stabs).
+      if (song.bassPat[s] != null) {
+        this.tone(nf(root + song.bassPat[s]), t, song.stepDur * 0.95, 'triangle', song.bassVol, this.musicGain);
+      }
+      if (song.waltzStab && song.waltzStab[s]) {
+        this.tone(nf(root + 12), t, song.stepDur * 0.7, 'triangle', 0.14, this.musicGain);
+        this.tone(nf(root + 19), t, song.stepDur * 0.7, 'triangle', 0.10, this.musicGain);
+      }
+      // Melody (octave doubler layers in when the horde is big).
+      const m = song.mel[step];
+      if (m != null) {
+        this.tone(nf(m), t, song.stepDur * 1.1, song.melType, song.melVol, this.musicGain, 0, 11);
+        if (this.intensity > 0.5) this.tone(nf(m + 12), t, song.stepDur * 0.8, 'sine', 0.035, this.musicGain);
+      }
+      // Drums.
+      if (song.kick[s]) this.tone(58, t, 0.12, 'sine', 0.3, this.musicGain, 40);
+      if (song.snare[s]) this.nz(t, 0.09, 0.09, 1400);
+      if (song.hat[s]) this.nz(t, 0.03, 0.05, 7000);
+
       this.beat++;
-      this.nextT += MARCH.stepDur;
+      this.songT += song.stepDur;
+      this.nextT += song.stepDur;
+
+      // Rotate at a song boundary once we've been on this tune ~2 minutes.
+      if (this.beat % totalSteps === 0 && this.songT >= SONG_ROTATE_SEC) {
+        this.songIdx = (this.songIdx + 1) % SONGS.length;
+        this.beat = 0;
+        this.songT = 0;
+        this.nextT += 0.9; // one breath between songs
+      }
     }
   }
 
