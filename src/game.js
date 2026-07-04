@@ -41,6 +41,7 @@ export class Game {
     this.runStats = { bots: 0, acorns: 0, time: 0 };
     this.lastStand = null;
     this.endCause = null;
+    this.rescueT = 10;
     this.camera = { x: 850, y: 650, zoom: 1, px: 850, py: 650, pz: 1 };
 
     this.proj = new Pool(() => ({ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, dmg: 0, friendly: true, homing: false, target: null, life: 0, color: '#fff', spin: false, ang: 0 }));
@@ -90,6 +91,7 @@ export class Game {
     this.boss = null;
     this.lastStand = null;
     this.endCause = null;
+    this.rescueT = 10;
     this.players = [];
     const p1 = new Piper(0, this.arena.w / 2 - 30, this.arena.h / 2, this.save.little[0]);
     this.players.push(p1);
@@ -402,6 +404,30 @@ export class Game {
       this.audio.sfx('waveclear');
       this.fx.confetti(this.players[0].x, this.players[0].y - 30, 20);
     }
+
+    // RESCUE DRIP: a shrinking mob must be recoverable, not a slow death
+    // spiral. Below 5 critters a golden cage of wild volunteers appears
+    // (first within ~10s, then every 30s) until you're back on your feet.
+    if (this.state === 'run' && this.mob.count() < 5) {
+      this.rescueT -= dt;
+      if (this.rescueT <= 0) {
+        this.rescueT = 30;
+        const p = this.players.find(q => !q.dead && !q.downed) || this.players[0];
+        const a = Math.random() * Math.PI * 2;
+        const d = randRange(240, 380);
+        this.cages.push({
+          x: clamp(p.x + Math.cos(a) * d, 150, this.arena.w - 150),
+          y: clamp(p.y + Math.sin(a) * d, 150, this.arena.h - 150),
+          wob: 0,
+          opened: false,
+          rescue: true,
+        });
+        this.ui.banner('WILD CRITTERS SPOTTED!', '#ffd166');
+        this.audio.sfx('cage');
+      }
+    } else {
+      this.rescueT = Math.min(this.rescueT, 10);
+    }
     this.updateProjectiles(dt);
     this.updateClouds(dt);
     this.updateAcorns(dt);
@@ -522,7 +548,7 @@ export class Game {
           this.audio.sfx('cage');
           this.fx.leaves(c.x, c.y, 6);
           const sp = this.randomSpecies();
-          const n = 3 + Math.floor(Math.random() * 2);
+          const n = (c.rescue ? 4 : 3) + Math.floor(Math.random() * 2);
           for (let k = 0; k < n; k++) {
             this.mob.add(this, sp, 1, c.x + randRange(-14, 14), c.y + randRange(-14, 14), p.slot);
           }

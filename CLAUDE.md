@@ -14,9 +14,16 @@ Round-3 (Brad feedback): mob health is a managed resource — HUD MOB bar,
 per-critter HP bars when hurt, critters heal 4%/s on shield duty, hunters
 auto-retreat to shield below 50% HP. Mob wipe triggers LAST STAND (12s to
 crack a cage, arrow points the way) else the run ends with cause 'mobwipe'
-(no soft-lock). Sneaky bots (25%, e.sneaky) target the piper directly so
+(no soft-lock). Sneaky bots (30%, e.sneaky) target the piper directly so
 piper HP matters before the mob dies; boss stomp/broom sweep deal 0.6-0.65x
 to critters so one AOE can't erase the packed orbit.
+
+Round-4 (Brad feedback): RESCUE DRIP — mob < 5 spawns a golden rescue cage
+(4-5 critters) within ~10s then every 30s, with a gold HUD arrow, so a
+shrinking mob is recoverable instead of a death spiral. Health scarcer:
+snack drop 9%→5%, regen 1.0→0.7 (little 1.2). Chasers get e.flank (personal
+bearing, fades inside 120px) so packs surround and box in instead of
+trailing in one clump.
 
 ## Status: complete & tuned
 

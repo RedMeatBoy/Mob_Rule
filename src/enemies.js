@@ -43,7 +43,10 @@ export class EnemySystem {
     e.hitT = 0; e.slowT = 0; e.kx = 0; e.ky = 0; e.touchCd = 0;
     e.dead = false; e.bagged = null; e.boss = !!def.boss; e.phase2 = false;
     e.face = 1; e.barkT = randRange(4, 12);
-    e.sneaky = !def.boss && kind !== 'cone' && Math.random() < 0.25;
+    e.sneaky = !def.boss && kind !== 'cone' && Math.random() < 0.3;
+    // Personal approach bearing: the pack fans out and boxes you in
+    // instead of trailing you in one clump.
+    e.flank = (Math.random() * 2 - 1) * 1.25;
     if (e.boss) {
       game.boss = e;
       game.audio.sfx('boss');
@@ -90,7 +93,7 @@ export class EnemySystem {
     game.audio.sfx('botdie');
     game.runStats.bots++;
     // Sometimes a snack falls out (the bots confiscated them from picnics).
-    if (Math.random() < 0.09 && !e.boss) game.dropSnack(e.x, e.y);
+    if (Math.random() < 0.05 && !e.boss) game.dropSnack(e.x, e.y);
     if (e.boss) { game.dropSnack(e.x - 20, e.y); game.dropSnack(e.x + 20, e.y); }
     // Acorns!
     const n = e.def.xp;
@@ -220,7 +223,14 @@ export class EnemySystem {
 
     switch (e.def.behavior) {
       case 'chase':
-        if (t) seek(t.x, t.y, e.speed);
+        if (t) {
+          // Curve in along a personal bearing (fades inside 120px so the
+          // final lunge is direct) — the pack surrounds instead of stacking.
+          const d = Math.hypot(t.x - e.x, t.y - e.y);
+          const f = Math.min(1, Math.max(0, (d - 120) / 240)) * e.flank;
+          const a = Math.atan2(t.y - e.y, t.x - e.x) + f;
+          seek(e.x + Math.cos(a) * d, e.y + Math.sin(a) * d, e.speed);
+        }
         break;
       case 'mowcharge':
         if (e.state === 'move') {

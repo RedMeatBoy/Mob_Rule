@@ -38,7 +38,9 @@ Balance it in real time: turtle up when swarmed, unleash when it's safe.
 **Your mob has health too** — watch the MOB bar at the top. Critters *heal
 while on shield duty*, and wounded hunters retreat home on their own to mend.
 If the whole mob falls, it's a **LAST STAND**: 12 seconds to crack a cage and
-rebuild, or the Tidy Empire wins.
+rebuild, or the Tidy Empire wins. Drop below 5 critters and **golden rescue
+cages** of wild volunteers start appearing — follow the gold arrow and
+rebuild the parade.
 
 ## 🐾 The rules of the mob
 
@@ -66,7 +68,7 @@ rebuild, or the Tidy Empire wins.
 ```bash
 git clone https://github.com/RedMeatBoy/Mob_Rule.git
 cd Mob_Rule && npx serve     # or python -m http.server
-node tests/engine.mjs        # 53 headless assertions
+node tests/engine.mjs        # 57 headless assertions
 node tests/simulate.mjs 24   # bot plays full runs; reports difficulty band
 node tests/perf.mjs          # 150-critter mob tick time
 ```

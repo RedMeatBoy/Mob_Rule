@@ -14,7 +14,7 @@ export class Piper {
     this.speed = 175;
     this.maxHp = little ? 140 : 100;
     this.hp = this.maxHp;
-    this.regen = little ? 1.6 : 1.0;   // HP per second (pauses briefly after a hit)
+    this.regen = little ? 1.2 : 0.7;   // HP per second (pauses briefly after a hit)
     this.sinceHit = 99;
     this.invuln = 0;
     this.face = 1;

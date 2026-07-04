@@ -229,9 +229,16 @@ export class UI {
     // Cages.
     for (const c of g.cages) {
       const wb = Math.sin(c.wob) * 2;
-      ctx.fillStyle = '#8a6b45';
+      if (c.rescue) {
+        // Golden rescue cage: glowing beacon of hope.
+        ctx.globalAlpha = 0.25 + Math.sin(this.t * 5) * 0.12;
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath(); ctx.arc(c.x, c.y, 30, 0, 6.29); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = c.rescue ? '#d4a437' : '#8a6b45';
       rr(ctx, c.x - 16, c.y - 14 + wb, 32, 26, 4); ctx.fill();
-      ctx.strokeStyle = '#5a4632'; ctx.lineWidth = 2.5;
+      ctx.strokeStyle = c.rescue ? '#8a6b1e' : '#5a4632'; ctx.lineWidth = 2.5;
       rr(ctx, c.x - 16, c.y - 14 + wb, 32, 26, 4); ctx.stroke();
       for (let i = -1; i <= 1; i++) {
         ctx.beginPath(); ctx.moveTo(c.x + i * 8, c.y - 14 + wb); ctx.lineTo(c.x + i * 8, c.y + 12 + wb); ctx.stroke();
@@ -474,6 +481,29 @@ export class UI {
         : `tap ${g.input.glyph(0, 'recall')} to call one back. Balance shield vs attack!`;
       ctx.strokeText(msg, VIEW_W / 2, VIEW_H - 70);
       ctx.fillText(msg, VIEW_W / 2, VIEW_H - 70);
+    }
+
+    // Low-mob guidance: gold arrow to the nearest cage while rebuilding.
+    if (!g.lastStand && g.state === 'run' && g.mob.count() < 5 && g.cages.length) {
+      const p = g.players.find(q => !q.dead && !q.downed);
+      if (p) {
+        let best = g.cages[0], bd = Infinity;
+        for (const cg of g.cages) {
+          const d = (cg.x - p.x) ** 2 + (cg.y - p.y) ** 2;
+          if (d < bd) { bd = d; best = cg; }
+        }
+        const a = Math.atan2(best.y - p.y, best.x - p.x);
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.translate(VIEW_W / 2, VIEW_H / 2);
+        ctx.rotate(a);
+        ctx.translate(130 + Math.sin(this.t * 6) * 10, 0);
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        ctx.moveTo(16, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
     }
 
     // LAST STAND: mob gone — countdown + arrow to the nearest cage.

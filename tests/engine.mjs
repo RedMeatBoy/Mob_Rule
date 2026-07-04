@@ -356,5 +356,55 @@ console.log('I) Round 3: mob health, retreat, last stand:');
   check(sneakyFound, 'sneaky bots target the piper through the wall');
 }
 
+console.log('J) Round 4: rescue drip + flanking:');
+{
+  // Below 5 critters, a golden rescue cage appears within ~10s.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  while (g.mob.count() > 2) g.mob.hurt(g, g.mob.list.find(c => c && !c._gone), 99999, null);
+  g.cages.length = 0;
+  let rescueAt = -1;
+  for (let i = 0; i < 60 * 15; i++) {
+    g.frame(1 / 60);
+    if (g.cages.some(c => c.rescue)) { rescueAt = i / 60; break; }
+  }
+  check(rescueAt >= 0 && rescueAt < 12, 'rescue cage spawns within ~10s when mob < 5', `at=${rescueAt.toFixed(1)}s`);
+  // A second one arrives on the ~30s cycle if you ignore the first.
+  const firstCount = g.cages.length;
+  for (let i = 0; i < 60 * 32 && g.state === 'run'; i++) {
+    // Keep the piper out of the cage's lap so it isn't auto-freed.
+    const p = g.players[0];
+    for (const c of g.cages) {
+      if ((c.x - p.x) ** 2 + (c.y - p.y) ** 2 < 80 * 80) { c.x = p.x + 500; c.y = p.y + 500; }
+    }
+    g.frame(1 / 60);
+    if (g.cages.length > firstCount) break;
+  }
+  check(g.state !== 'run' || g.cages.length > firstCount, 'rescue keeps dripping every ~30s while the mob is small');
+  // Healthy mob -> no rescue spam.
+  const g2 = new Game(null);
+  g2.input.assign(0, 'kb1');
+  g2.startRun();
+  g2.cages.length = 0;
+  for (let i = 0; i < 60 * 15; i++) g2.frame(1 / 60);
+  check(!g2.cages.some(c => c.rescue), 'no rescue cages while the mob is healthy');
+}
+{
+  // Flanking: two chasers with opposite bearings split around the target.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  const e1 = g.enemies.spawnNow(g, 'dustbot', p.x + 500, p.y);
+  const e2 = g.enemies.spawnNow(g, 'dustbot', p.x + 500, p.y);
+  e1.flank = 1.2; e2.flank = -1.2;
+  e1.sneaky = e2.sneaky = true;
+  e1.hp = e2.hp = 1e9;
+  for (let i = 0; i < 90; i++) g.frame(1 / 60);
+  const spread = Math.abs(e1.y - e2.y);
+  check(spread > 90, 'flanking chasers approach from different sides', `spread=${spread.toFixed(0)}px`);
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);
