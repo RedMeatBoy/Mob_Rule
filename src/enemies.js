@@ -22,6 +22,13 @@ export class EnemySystem {
 
   clear() { this.pool.clear(); this.telegraphs.length = 0; }
   count() { return this.pool.n; }
+  // Cones are placed obstacles the mob deliberately ignores — they must
+  // never hold a wave open.
+  threats() {
+    let n = 0;
+    for (let i = 0; i < this.pool.n; i++) if (this.pool.get(i).kind !== 'cone') n++;
+    return n;
+  }
 
   telegraphSpawn(kind, x, y, elite) {
     this.telegraphs.push({ kind, x, y, t: 0.6, elite });
@@ -43,6 +50,7 @@ export class EnemySystem {
     e.hitT = 0; e.slowT = 0; e.kx = 0; e.ky = 0; e.touchCd = 0;
     e.dead = false; e.bagged = null; e.boss = !!def.boss; e.phase2 = false;
     e.face = 1; e.barkT = randRange(4, 12);
+    e.life = kind === 'cone' ? 14 : Infinity;
     e.sneaky = !def.boss && kind !== 'cone' && Math.random() < 0.3;
     // Personal approach bearing: the pack fans out and boxes you in
     // instead of trailing you in one clump.
@@ -332,6 +340,12 @@ export class EnemySystem {
         break;
       case 'static':
         e.vx = 0; e.vy = 0;
+        // Cones wobble away on their own — they're area denial, not a chore.
+        e.life -= dt;
+        if (e.life <= 0) {
+          e.dead = true;
+          game.fx.leaves(e.x, e.y, 4);
+        }
         break;
       case 'boss_mowtron': this.bossMowtron(e, dt, game, t, seek); break;
       case 'boss_succ': this.bossSucc(e, dt, game, t, seek); break;

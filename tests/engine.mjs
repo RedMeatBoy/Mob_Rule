@@ -406,5 +406,39 @@ console.log('J) Round 4: rescue drip + flanking:');
   check(spread > 90, 'flanking chasers approach from different sides', `spread=${spread.toFixed(0)}px`);
 }
 
+console.log('K) Hotfix: cones must not hold waves open; breeding is linear:');
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  // Only cones left on the field, timer expired -> wave must be done.
+  g.enemies.spawnNow(g, 'cone', 500, 500);
+  g.enemies.spawnNow(g, 'cone', 600, 500);
+  g.waveT = 0;
+  check(g.enemies.count() >= 2 && g.waveDone(), 'leftover cones do not block wave completion');
+  // Cones expire on their own within ~14s.
+  let coneAlive = true;
+  for (let i = 0; i < 60 * 16 && g.state === 'run'; i++) {
+    g.frame(1 / 60);
+    coneAlive = [...Array(g.enemies.pool.n)].some((_, k) => g.enemies.pool.get(k).kind === 'cone' && !g.enemies.pool.get(k).dead);
+    if (!coneAlive) break;
+  }
+  check(!coneAlive, 'cones tidy themselves away');
+}
+{
+  // Bunny breeding: one global timer -> linear growth, no runaway.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.save.acorns = 99999;
+  g.startRun();
+  g.mob.wild.bunnyBreed = true;
+  for (let i = 0; i < 12; i++) g.mob.add(g, 'bunny', 1, g.players[0].x, g.players[0].y, 0, true);
+  const worth = () => g.mob.list.reduce((s, c) => s + (c && !c._gone ? 3 ** (c.tier - 1) : 0), 0);
+  const w0 = worth();
+  for (let i = 0; i < 60 * 36; i++) g.frame(1 / 60);
+  const grown = worth() - w0;
+  check(grown >= 1 && grown <= 8, 'breeding adds ~1 bunny per ~11s regardless of bunny count', `grown=${grown} in 36s`);
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

@@ -136,10 +136,15 @@ export class Game {
     if (this.waveT > 0) return false;
     const def = WAVES[this.waveNum - 1];
     if (def.boss && this.boss) return false;
-    return this.enemies.count() === 0 && this.enemies.telegraphs.length === 0;
+    return this.enemies.threats() === 0 && this.enemies.telegraphs.length === 0;
   }
 
   endWave() {
+    // Any leftover cones tidy themselves away.
+    for (let i = 0; i < this.enemies.pool.n; i++) {
+      const e = this.enemies.pool.get(i);
+      if (e.kind === 'cone') { e.dead = true; this.fx.leaves(e.x, e.y, 3); }
+    }
     this.audio.sfx('waveclear');
     this.fx.confetti(this.camera.x, this.camera.y - 60, 20);
     // Sweep leftover pickups to the piper.

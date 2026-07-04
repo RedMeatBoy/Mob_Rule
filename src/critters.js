@@ -352,14 +352,20 @@ export class MobSystem {
       c.y = clamp(c.y, 30, game.arena.h - 30);
       if (Math.abs(c.vx) > 8) c.face = c.vx > 0 ? 1 : -1;
 
-      // Wild: bunny breeding.
-      if (this.wild.bunnyBreed && c.sp === 'bunny') {
-        c.breedT -= dt;
-        if (c.breedT <= 0) {
-          c.breedT = randRange(10, 16);
-          if (this.list.length < MOB_CAP) {
-            this.add(game, 'bunny', 1, c.x + randRange(-8, 8), c.y + randRange(-8, 8), c.owner, true);
-            game.fx.hearts(c.x, c.y - 12, 4);
+    }
+
+    // Wild: bunny breeding. ONE mob-wide timer (not per bunny!) — otherwise
+    // every new bunny breeds more bunnies and growth turns exponential.
+    if (this.wild.bunnyBreed) {
+      this.breedT = (this.breedT ?? 8) - dt;
+      if (this.breedT <= 0) {
+        this.breedT = randRange(9, 14);
+        if (this.list.length < MOB_CAP) {
+          const bunnies = this.list.filter(c => c && !c._gone && !c.bagged && c.sp === 'bunny');
+          if (bunnies.length) {
+            const b = bunnies[Math.floor(Math.random() * bunnies.length)];
+            this.add(game, 'bunny', 1, b.x + randRange(-8, 8), b.y + randRange(-8, 8), b.owner, true);
+            game.fx.hearts(b.x, b.y - 12, 4);
             game.audio.sfx('squeak');
           }
         }
