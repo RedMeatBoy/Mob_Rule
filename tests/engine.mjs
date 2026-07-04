@@ -266,5 +266,95 @@ console.log('H) Wild cards:');
   check(g.mob.countOf('bee', 1) === bees + 1, 'Bee Solidarity: a bee joins when a critter is lost');
 }
 
+console.log('I) Round 3: mob health, retreat, last stand:');
+{
+  const audioSrc = await import('node:fs').then(fs => fs.readFileSync(join(root, 'src/audio.js'), 'utf8'));
+  const names = [...audioSrc.matchAll(/name: ['"]([^'"]+)['"]/g)].map(m => m[1]);
+  check(names.length >= 5, `5 songs authored (${names.join(', ')})`);
+}
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  // Shield regen: hurt a critter, it heals on wall duty.
+  const c = g.mob.list[0];
+  const cmax = g.mob.maxHp(c.sp, c.tier);
+  c.hp = cmax * 0.4;
+  for (let i = 0; i < 60 * 4; i++) g.frame(1 / 60);
+  check(c.hp > cmax * 0.5, 'critters heal while on shield duty', `hp=${c.hp.toFixed(1)}/${cmax}`);
+  // Auto-retreat: wounded hunter falls back to shield.
+  g.input.tap = null;
+  g.input.keys.add('Space');
+  g.frame(1 / 60);
+  g.input.keys.delete('Space');
+  const hunter = g.mob.list.find(q => q.duty === 'attack');
+  check(!!hunter, 'a hunter was sent');
+  if (hunter) {
+    hunter.hp = g.mob.maxHp(hunter.sp, hunter.tier) * 0.3;
+    for (let i = 0; i < 30; i++) g.frame(1 / 60);
+    check(hunter.duty === 'shield', 'wounded hunter auto-retreats to the shield');
+  }
+  // Aggregate mob health reads sanely.
+  const mh = g.mob.mobHealth();
+  check(mh.max > 0 && mh.frac > 0 && mh.frac <= 1, 'mobHealth() aggregate is sane', JSON.stringify(mh));
+}
+{
+  // Last stand: wipe the mob with a cage on the field -> countdown; freeing
+  // the cage cancels it.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  g.cages.length = 0;
+  g.cages.push({ x: p.x + 60, y: p.y, sp: 'frog', n: 2, hp: 1, wob: 0 });
+  for (const c of [...g.mob.list]) g.mob.hurt(g, c, 99999, null);
+  g.frame(1 / 60);
+  check(g.mob.count() === 0 && g.state === 'run' && !!g.lastStand, 'mob wipe with a cage triggers LAST STAND', `state=${g.state}`);
+  // March to the cage: freeing it should refill the mob and cancel.
+  let saved = false;
+  for (let i = 0; i < 60 * 8 && !saved; i++) {
+    g.input.keys.add('KeyD');
+    g.frame(1 / 60);
+    saved = g.mob.count() > 0;
+  }
+  g.input.keys.delete('KeyD');
+  g.frame(1 / 60); // the cancel lands on the next tick
+  check(saved && !g.lastStand, 'freeing a cage rescues the run', `mob=${g.mob.count()}`);
+  // Now wipe with no cages: run ends with the mobwipe cause.
+  g.cages.length = 0;
+  for (const c of [...g.mob.list]) g.mob.hurt(g, c, 99999, null);
+  g.frame(1 / 60);
+  check(g.state === 'gameover' && g.endCause === 'mobwipe', 'mob wipe with no cages ends the run (no soft-lock)', `state=${g.state} cause=${g.endCause}`);
+}
+{
+  // Last stand timeout: cage exists but the piper never reaches it.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  g.cages.length = 0;
+  g.cages.push({ x: p.x + 2000, y: p.y, sp: 'frog', n: 2, hp: 1, wob: 0 });
+  for (const c of [...g.mob.list]) g.mob.hurt(g, c, 99999, null);
+  for (let i = 0; i < 60 * 14 && g.state === 'run'; i++) g.frame(1 / 60);
+  check(g.state === 'gameover' && g.endCause === 'mobwipe', 'LAST STAND countdown expiring ends the run');
+}
+{
+  // Sneaky bots exist and target the piper.
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  let sneakyFound = false;
+  for (let i = 0; i < 300 && !sneakyFound; i++) {
+    const e = g.enemies.spawnNow(g, 'dustbot', p.x + 200, p.y);
+    if (e && e.sneaky) {
+      const t = g.enemies.pickTarget(e, g);
+      sneakyFound = t === p;
+    }
+  }
+  check(sneakyFound, 'sneaky bots target the piper through the wall');
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

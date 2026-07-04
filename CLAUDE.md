@@ -7,8 +7,16 @@ input, headlessly simulatable balance. No platforming, no feel-critical physics.
 **Core fantasy:** the mob IS the shield, the weapon, and the progression.
 Redesign (Brad round-2 feedback): critters ORBIT the piper as a shield;
 Space sends ONE out to hunt (hold = stream), Shift recalls one (hold = all).
-Piper has 100 HP + slow regen + apple drops (+25). Music: 3 songs 30s+ each
-(march/parade/waltz), rotating every ~2 min at song boundaries.
+Piper has 100 HP + slow regen + apple drops (+25). Music: 5 songs 30s+ each,
+rotating every ~2 min at song boundaries.
+
+Round-3 (Brad feedback): mob health is a managed resource — HUD MOB bar,
+per-critter HP bars when hurt, critters heal 4%/s on shield duty, hunters
+auto-retreat to shield below 50% HP. Mob wipe triggers LAST STAND (12s to
+crack a cage, arrow points the way) else the run ends with cause 'mobwipe'
+(no soft-lock). Sneaky bots (25%, e.sneaky) target the piper directly so
+piper HP matters before the mob dies; boss stomp/broom sweep deal 0.6-0.65x
+to critters so one AOE can't erase the packed orbit.
 
 ## Status: complete & tuned
 

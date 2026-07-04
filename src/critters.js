@@ -232,6 +232,16 @@ export class MobSystem {
     return best;
   }
 
+  mobHealth() {
+    let cur = 0, max = 0;
+    for (const cc of this.list) {
+      if (cc.bagged || cc._gone) continue;
+      cur += Math.max(0, cc.hp);
+      max += this.maxHp(cc.sp, cc.tier);
+    }
+    return { cur, max, frac: max > 0 ? cur / max : 1 };
+  }
+
   counts(owner) {
     let shield = 0, attack = 0;
     for (const c of this.list) {
@@ -286,7 +296,25 @@ export class MobSystem {
         } else { c.vx *= 0.7; c.vy *= 0.7; }
         if (def.role === 'heal') this.healInPlace(c, def, game);
         else this.attackInPlace(c, def, game, statFor(c.sp, c.tier, 'size'));
+        // The shield is where you heal: 4% max HP per second on wall duty.
+        const cmax = this.maxHp(c.sp, c.tier);
+        if (c.hp < cmax) {
+          c.hp = Math.min(cmax, c.hp + cmax * 0.04 * dt);
+          if (c.hp > cmax * 0.85) c.retreatFx = false;
+        }
       } else {
+        // Wounded hunters fall back to the shield automatically to recover.
+        const cmax = this.maxHp(c.sp, c.tier);
+        if (c.hp < cmax * 0.5) {
+          c.duty = 'shield';
+          c.target = null;
+          if (!c.retreatFx) {
+            c.retreatFx = true;
+            game.fx.num(c.x, c.y - 16, 'retreating!', '#ffd166', 10);
+            game.fx.ring(c.x, c.y, 16, '#ffd166', 0.3);
+          }
+          continue;
+        }
         // Hunter: seek and destroy, freely.
         let moved = false;
         if (def.role === 'heal') {
@@ -527,6 +555,16 @@ export class MobSystem {
         ctx.fillStyle = '#fff';
         ctx.beginPath(); ctx.arc(x, y + hop, size, 0, 6.29); ctx.fill();
         ctx.globalAlpha = 1;
+      }
+      {
+        const cmax = this.maxHp(c.sp, c.tier);
+        if (c.hp < cmax * 0.65) {
+          const f = Math.max(0, c.hp / cmax);
+          ctx.fillStyle = 'rgba(20,30,15,0.55)';
+          ctx.fillRect(x - 9, y + hop - size - 7, 18, 3);
+          ctx.fillStyle = f < 0.3 ? '#ff5c5c' : '#e8c33a';
+          ctx.fillRect(x - 9, y + hop - size - 7, 18 * f, 3);
+        }
       }
       if (c.duty === 'attack') {
         // Little red bandana: this one is on the hunt.

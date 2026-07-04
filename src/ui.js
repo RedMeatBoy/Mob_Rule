@@ -326,9 +326,24 @@ export class UI {
     ctx.fillStyle = mc >= MOB_CAP ? '#ffd166' : '#fff';
     ctx.fillText(`MOB ${mc}`, 0, 0);
     ctx.restore();
+    // Mob health bar — see the wall wearing down BEFORE it collapses.
+    const mh = g.mob.mobHealth();
+    const mbw = 150;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    rr(ctx, VIEW_W / 2 - mbw / 2, 56, mbw, 9, 4); ctx.fill();
+    if (mh.max > 0 && mh.frac > 0) {
+      const hurting = mh.frac < 0.5;
+      ctx.fillStyle = hurting ? (Math.sin(this.t * 8) > 0 ? '#ff5c5c' : '#c53030') : mh.frac < 0.75 ? '#e8c33a' : '#7ec850';
+      rr(ctx, VIEW_W / 2 - mbw / 2, 56, Math.max(6, mbw * mh.frac), 9, 4); ctx.fill();
+      if (hurting) {
+        ctx.font = `bold 12px ${FONT}`;
+        ctx.fillStyle = '#ff8a8a';
+        ctx.fillText('MOB HURT — recall & let them heal!', VIEW_W / 2, 80);
+      }
+    }
     ctx.font = `bold 13px ${FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText(`wave ${g.waveNum}/12 · ${Math.ceil(g.waveT)}s`, VIEW_W / 2, 68);
+    ctx.fillText(`wave ${g.waveNum}/12 · ${Math.ceil(g.waveT)}s`, VIEW_W / 2, mh.frac < 0.5 ? 94 : 80);
 
     // Piper HP bars — big, labeled, they POP on damage.
     g.players.forEach((p, i) => {
@@ -459,6 +474,46 @@ export class UI {
         : `tap ${g.input.glyph(0, 'recall')} to call one back. Balance shield vs attack!`;
       ctx.strokeText(msg, VIEW_W / 2, VIEW_H - 70);
       ctx.fillText(msg, VIEW_W / 2, VIEW_H - 70);
+    }
+
+    // LAST STAND: mob gone — countdown + arrow to the nearest cage.
+    if (g.lastStand) {
+      const pulse = 1 + Math.sin(this.t * 8) * 0.08;
+      ctx.save();
+      ctx.translate(VIEW_W / 2, VIEW_H * 0.42);
+      ctx.scale(pulse, pulse);
+      ctx.font = `bold 54px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(40,10,10,0.9)'; ctx.lineWidth = 8;
+      ctx.strokeText(Math.ceil(g.lastStand.t), 0, 0);
+      ctx.fillStyle = '#ff5c5c';
+      ctx.fillText(Math.ceil(g.lastStand.t), 0, 0);
+      ctx.restore();
+      ctx.font = `bold 20px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(40,10,10,0.8)'; ctx.lineWidth = 5;
+      ctx.strokeText('LAST STAND — free a cage to rebuild the mob!', VIEW_W / 2, VIEW_H * 0.42 + 44);
+      ctx.fillText('LAST STAND — free a cage to rebuild the mob!', VIEW_W / 2, VIEW_H * 0.42 + 44);
+      // Arrow to nearest cage.
+      const p = g.players.find(q => !q.dead && !q.downed);
+      if (p && g.cages.length) {
+        let best = g.cages[0], bd = Infinity;
+        for (const cg of g.cages) {
+          const d = (cg.x - p.x) ** 2 + (cg.y - p.y) ** 2;
+          if (d < bd) { bd = d; best = cg; }
+        }
+        const a = Math.atan2(best.y - p.y, best.x - p.x);
+        ctx.save();
+        ctx.translate(VIEW_W / 2, VIEW_H / 2);
+        ctx.rotate(a);
+        ctx.translate(150 + Math.sin(this.t * 6) * 12, 0);
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        ctx.moveTo(22, 0); ctx.lineTo(-10, -14); ctx.lineTo(-10, 14);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
     }
 
     // Banner.
@@ -656,7 +711,8 @@ export class UI {
     ctx.font = `bold 52px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(20,30,12,0.85)'; ctx.lineWidth = 7;
-    const title = won ? '🌿 NATURE WINS 🌿' : 'THE PIPER GOT BONKED!';
+    const wiped = g.endCause === 'mobwipe';
+    const title = won ? '🌿 NATURE WINS 🌿' : wiped ? 'THE MOB WAS SWEPT AWAY!' : 'THE PIPER GOT BONKED!';
     ctx.strokeText(title, VIEW_W / 2, 150);
     ctx.fillStyle = won ? '#ffd166' : '#ff8a8a';
     ctx.fillText(title, VIEW_W / 2, 150);
@@ -664,10 +720,14 @@ export class UI {
       // Say exactly WHY the run ended and what to do about it.
       ctx.font = `bold 19px ${FONT}`;
       ctx.fillStyle = '#fff';
-      this.wrap(ctx, 'Your HP hit zero — the mob only marches for a standing piper.', VIEW_W / 2, 190, 700, 24);
+      this.wrap(ctx, wiped
+        ? 'Every last critter was lost — a piper without a mob is just a kid with a flute.'
+        : 'Your HP hit zero — the mob only marches for a standing piper.', VIEW_W / 2, 190, 700, 24);
       ctx.font = `16px ${FONT}`;
       ctx.fillStyle = '#c8e0b8';
-      this.wrap(ctx, `Next run: keep more critters on SHIELD duty (${g.input.glyph(0, 'recall')} recalls hunters), grab snack drops to heal, and stand still a moment to regenerate.`, VIEW_W / 2, 220, 720, 21);
+      this.wrap(ctx, wiped
+        ? 'Next run: watch the MOB bar under the counter. Hurt hunters retreat on their own — let them heal in the shield before sending them back out. And crack every cage!'
+        : `Next run: keep more critters on SHIELD duty (${g.input.glyph(0, 'recall')} recalls hunters), grab snack drops to heal, and stand still a moment to regenerate.`, VIEW_W / 2, 220, 720, 21);
     }
     ctx.font = `italic 17px ${FONT}`;
     ctx.fillStyle = '#e8e0d0';

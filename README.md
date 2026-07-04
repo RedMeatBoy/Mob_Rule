@@ -35,6 +35,11 @@ Balance it in real time: turtle up when swarmed, unleash when it's safe.
 +25, and shield critters nibble anything that breaches the wall. Walk over
 **cages** to free recruits, and never stop moving.
 
+**Your mob has health too** — watch the MOB bar at the top. Critters *heal
+while on shield duty*, and wounded hunters retreat home on their own to mend.
+If the whole mob falls, it's a **LAST STAND**: 12 seconds to crack a cage and
+rebuild, or the Tidy Empire wins.
+
 ## 🐾 The rules of the mob
 
 - **Three of a kind MERGE.** Three frogs become a Bullfrog. Three Bullfrogs
@@ -61,7 +66,7 @@ Balance it in real time: turtle up when swarmed, unleash when it's safe.
 ```bash
 git clone https://github.com/RedMeatBoy/Mob_Rule.git
 cd Mob_Rule && npx serve     # or python -m http.server
-node tests/engine.mjs        # 31 headless assertions
+node tests/engine.mjs        # 53 headless assertions
 node tests/simulate.mjs 24   # bot plays full runs; reports difficulty band
 node tests/perf.mjs          # 150-critter mob tick time
 ```

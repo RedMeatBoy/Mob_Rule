@@ -39,6 +39,8 @@ export class Game {
     this.acc = 0;
     this.alpha = 1;
     this.runStats = { bots: 0, acorns: 0, time: 0 };
+    this.lastStand = null;
+    this.endCause = null;
     this.camera = { x: 850, y: 650, zoom: 1, px: 850, py: 650, pz: 1 };
 
     this.proj = new Pool(() => ({ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, dmg: 0, friendly: true, homing: false, target: null, life: 0, color: '#fff', spin: false, ang: 0 }));
@@ -86,6 +88,8 @@ export class Game {
     this.fx.clear();
     this.runStats = { bots: 0, acorns: 0, time: 0 };
     this.boss = null;
+    this.lastStand = null;
+    this.endCause = null;
     this.players = [];
     const p1 = new Piper(0, this.arena.w / 2 - 30, this.arena.h / 2, this.save.little[0]);
     this.players.push(p1);
@@ -165,7 +169,8 @@ export class Game {
     }
   }
 
-  endRun(won) {
+  endRun(won, cause) {
+    this.endCause = cause || null;
     this.save.bestWave = Math.max(this.save.bestWave, this.waveNum);
     this.save.biggestMob = Math.max(this.save.biggestMob, this.mob.biggest);
     this.save.acorns += this.runStats.acorns;
@@ -374,6 +379,29 @@ export class Game {
 
     this.mob.update(dt, this);
     this.enemies.update(dt, this);
+
+    // MOB WIPE: without critters the run cannot be won — no soft-locks here.
+    if (this.mob.count() === 0 && this.state === 'run') {
+      if (!this.lastStand) {
+        if (this.cages.length > 0) {
+          this.lastStand = { t: 12 };
+          this.ui.banner('MOB LOST — FREE A CAGE, FAST!', '#e05c5c');
+          this.audio.sfx('defeat');
+        } else {
+          this.endRun(false, 'mobwipe');
+          return;
+        }
+      } else {
+        this.lastStand.t -= dt;
+        if (this.lastStand.t <= 0) { this.endRun(false, 'mobwipe'); return; }
+        if (this.cages.length === 0) { this.endRun(false, 'mobwipe'); return; }
+      }
+    } else if (this.lastStand && this.mob.count() > 0) {
+      this.lastStand = null;
+      this.ui.banner('THE PARADE LIVES!', '#7ec850');
+      this.audio.sfx('waveclear');
+      this.fx.confetti(this.players[0].x, this.players[0].y - 30, 20);
+    }
     this.updateProjectiles(dt);
     this.updateClouds(dt);
     this.updateAcorns(dt);

@@ -75,7 +75,47 @@ const SONG_WALTZ = {
   melVol: 0.11, melType: 'triangle', bassVol: 0.34,
 };
 
-const SONGS = [SONG_MARCH, SONG_PARADE, SONG_WALTZ];
+// --- Song 4: "Sunny Side Strut" — F major, syncopated swagger, ~29s ---
+const S_1 = P(65, null, 69, null, 72, null, 69, 72, 74, null, 72, 69, 65, null, null, null);
+const S_2 = P(65, null, 69, null, 72, null, 74, 76, 77, null, 76, 74, 72, null, null, null);
+const S_3 = P(74, null, 74, 72, 70, null, 72, null, 69, null, 70, 72, 65, null, null, null);
+const S_4 = P(77, 76, 74, null, 72, 74, 72, 69, 67, null, 69, 72, 65, null, null, null);
+const SONG_STRUT = {
+  name: 'Sunny Side Strut', stepDur: 0.15, spb: 8,
+  bassBars: flat(
+    P(41, 41, 46, 46, 41, 41, 48, 48),   // F F Bb Bb F F C C
+    P(50, 50, 46, 46, 41, 48, 41, 41),   // Dm Dm Bb Bb F C F F
+    P(41, 46, 41, 48, 41, 46, 48, 41),
+  ),
+  mel: flat(S_1, S_2, S_1, S_2, S_3, S_4, S_3, S_4, S_1, S_2, S_3, S_4),
+  bassPat: [0, null, 7, null, 12, null, 7, null],
+  kick: [1, 0, 0, 0, 1, 0, 0, 0],
+  snare: [0, 0, 1, 0, 0, 0, 1, 0],
+  hat: [1, 0, 1, 1, 0, 1, 1, 0],
+  melVol: 0.10, melType: 'square', bassVol: 0.30,
+};
+
+// --- Song 5: "The Tidy Empire's Lament" — D minor, mischievous, ~33s ---
+const L_1 = P(62, null, 65, null, 69, null, 65, 62, 64, null, 62, null, null, null, null, null);
+const L_2 = P(62, null, 65, null, 69, null, 72, 70, 69, 67, 65, 67, 62, null, null, null);
+const L_3 = P(70, null, 69, 67, 65, null, 67, null, 69, null, 73, null, 74, null, null, null);
+const L_4 = P(74, 72, 70, 69, 67, 65, 64, 62, 61, null, 62, null, null, null, null, null);
+const SONG_LAMENT = {
+  name: "The Tidy Empire's Lament", stepDur: 0.17, spb: 8,
+  bassBars: flat(
+    P(38, 38, 43, 43, 38, 38, 45, 45),   // Dm Dm Gm Gm Dm Dm A A
+    P(46, 46, 43, 43, 38, 45, 38, 38),   // Bb Bb Gm Gm Dm A Dm Dm
+    P(38, 43, 38, 45, 46, 43, 45, 38),
+  ),
+  mel: flat(L_1, L_2, L_1, L_2, L_3, L_4, L_3, L_4, L_1, L_2, L_3, L_4),
+  bassPat: [0, null, 12, null, 7, null, 12, null],
+  kick: [1, 0, 0, 1, 0, 0, 1, 0],
+  snare: [0, 0, 0, 0, 1, 0, 0, 0],
+  hat: [0, 1, 1, 0, 1, 1, 0, 1],
+  melVol: 0.10, melType: 'triangle', bassVol: 0.32,
+};
+
+const SONGS = [SONG_MARCH, SONG_PARADE, SONG_STRUT, SONG_WALTZ, SONG_LAMENT];
 const SONG_ROTATE_SEC = 120; // switch songs every ~2 minutes (at a song boundary)
 
 export class AudioSystem {

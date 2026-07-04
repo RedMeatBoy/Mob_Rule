@@ -43,6 +43,7 @@ export class EnemySystem {
     e.hitT = 0; e.slowT = 0; e.kx = 0; e.ky = 0; e.touchCd = 0;
     e.dead = false; e.bagged = null; e.boss = !!def.boss; e.phase2 = false;
     e.face = 1; e.barkT = randRange(4, 12);
+    e.sneaky = !def.boss && kind !== 'cone' && Math.random() < 0.25;
     if (e.boss) {
       game.boss = e;
       game.audio.sfx('boss');
@@ -175,8 +176,19 @@ export class EnemySystem {
     }
   }
 
-  // Target: nearest critter, else nearest piper. Tanks taunt.
+  // Target: nearest critter, else nearest piper. Tanks taunt. Sneaky bots
+  // (25%) ignore the wall and go straight for the piper — keeps piper HP
+  // honest all game instead of "full health until the mob dies".
   pickTarget(e, game) {
+    if (e.sneaky) {
+      let bp = null, bpd = Infinity;
+      for (const p of game.players) {
+        if (p.dead || p.downed) continue;
+        const d2 = dist2(e.x, e.y, p.x, p.y);
+        if (d2 < bpd) { bpd = d2; bp = p; }
+      }
+      if (bp && bpd < 480 * 480) return bp;
+    }
     let best = null, bd = Infinity, bestTank = null, bt = Infinity;
     for (const c of game.mob.list) {
       if (c.bagged) continue;
@@ -258,7 +270,7 @@ export class EnemySystem {
           game.mob.grid.query(e.x, e.y, e.def.sweepRange, c => {
             if (c.bagged) return;
             if (dist2(e.x, e.y, c.x, c.y) < e.def.sweepRange * e.def.sweepRange) {
-              game.mob.hurt(game, c, e.dmg, e);
+              game.mob.hurt(game, c, e.dmg * 0.65, e);
               const a = Math.atan2(c.y - e.y, c.x - e.x);
               c.x += Math.cos(a) * 50; c.y += Math.sin(a) * 50;
             }
@@ -415,7 +427,7 @@ export class EnemySystem {
         game.shake(0.6);
         game.fx.ring(e.x, e.y, 190, '#e8c33a', 0.5);
         game.mob.grid.query(e.x, e.y, 190, c => {
-          if (!c.bagged && dist2(e.x, e.y, c.x, c.y) < 190 * 190) game.mob.hurt(game, c, e.dmg, e);
+          if (!c.bagged && dist2(e.x, e.y, c.x, c.y) < 190 * 190) game.mob.hurt(game, c, e.dmg * 0.6, e);
         });
         for (const p of game.players) {
           if (!p.dead && !p.downed && dist2(e.x, e.y, p.x, p.y) < 190 * 190) p.hurt(game, 20, e);
