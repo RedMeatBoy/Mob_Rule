@@ -440,5 +440,33 @@ console.log('K) Hotfix: cones must not hold waves open; breeding is linear:');
   check(grown >= 1 && grown <= 8, 'breeding adds ~1 bunny per ~11s regardless of bunny count', `grown=${grown} in 36s`);
 }
 
+console.log('L) Round 5: readable notices, voice announcer, acorn clarity:');
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  // notice() text lives long enough to read (2.6s vs 0.55s).
+  g.fx.notice(100, 100, 'TEST NOTICE', '#fff');
+  const d = g.fx.nums.get(g.fx.nums.n - 1);
+  check(d.txt === 'TEST NOTICE' && d.life > 2, 'notice text stays up 2.6s', `life=${d.life}`);
+  // say() is safe headless (no speechSynthesis in tests) and after mute.
+  let threw = false;
+  try { g.audio.say('Wave one!', true); g.audio.setMuted(true); g.audio.say('quiet'); g.audio.setMuted(false); } catch (e) { threw = true; }
+  check(!threw, 'voice announcer degrades gracefully without speech support');
+  // First acorn of a run teaches what acorns do — once.
+  const p = g.players[0];
+  g.dropAcorn(p.x, p.y, 1);
+  for (let i = 0; i < 30; i++) g.frame(1 / 60);
+  const hints = [...Array(g.fx.nums.n)].filter((_, k) => g.fx.nums.get(k).txt.includes('unlock')).length;
+  check(g.acornHintDone && hints >= 1, 'first acorn pickup explains unlocks', `hints=${hints}`);
+  g.dropAcorn(p.x, p.y, 1);
+  for (let i = 0; i < 30; i++) g.frame(1 / 60);
+  const hints2 = [...Array(g.fx.nums.n)].filter((_, k) => g.fx.nums.get(k).txt.includes('unlock')).length;
+  check(hints2 <= hints, 'acorn hint does not repeat');
+  // Ambient chatter timer ticks without crashing.
+  for (let i = 0; i < 60 * 6; i++) g.frame(1 / 60);
+  check(typeof g.mob.chatterT === 'number', 'mob chatter timer runs');
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

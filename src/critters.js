@@ -354,6 +354,17 @@ export class MobSystem {
 
     }
 
+    // Ambient chatter: every few seconds a random critter pipes up
+    // (ribbit! quack! baa!) so the mob sounds like a mob.
+    this.chatterT = (this.chatterT ?? 2) - dt;
+    if (this.chatterT <= 0) {
+      this.chatterT = randRange(2.2, 4.5);
+      if (this.list.length) {
+        const c = this.list[Math.floor(Math.random() * this.list.length)];
+        if (c && !c._gone && !c.bagged) game.audio.sfx(SPECIES[c.sp].sound);
+      }
+    }
+
     // Wild: bunny breeding. ONE mob-wide timer (not per bunny!) — otherwise
     // every new bunny breeds more bunnies and growth turns exponential.
     if (this.wild.bunnyBreed) {

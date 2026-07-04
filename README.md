@@ -68,13 +68,15 @@ rebuild the parade.
 ```bash
 git clone https://github.com/RedMeatBoy/Mob_Rule.git
 cd Mob_Rule && npx serve     # or python -m http.server
-node tests/engine.mjs        # 57 headless assertions
+node tests/engine.mjs        # 65 headless assertions
 node tests/simulate.mjs 24   # bot plays full runs; reports difficulty band
 node tests/perf.mjs          # 150-critter mob tick time
 ```
 
 Vanilla JS + Canvas, zero dependencies, zero asset files — every critter is
 drawn in code and every sound (including each species' voice) is synthesized.
+A friendly announcer (your browser's built-in speech) calls out waves, bosses,
+and powerups — perfect for players who can't read yet.
 The whole game is balance-simulated headlessly before any human plays it.
 
 ---

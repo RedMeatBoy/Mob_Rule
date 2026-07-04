@@ -60,12 +60,15 @@ export class FX {
     this.ring(x, y, 40, '#ffffff', 0.35);
   }
   ring(x, y, r, color, dur) { this.rings.push({ x, y, r, color, life: dur, maxLife: dur }); }
-  num(x, y, txt, color, size) {
+  num(x, y, txt, color, size, life) {
     const d = this.nums.alloc();
     d.x = x + randRange(-6, 6); d.y = y - 8;
-    d.vy = -50; d.life = 0.55;
+    d.life = life || 0.55;
+    d.vy = d.life > 1 ? -14 : -50; // long-lived text drifts slowly so it's readable
     d.txt = String(txt); d.color = color || '#fff'; d.size = size || 12;
   }
+  // Important announcements: big, slow, on screen long enough to actually read.
+  notice(x, y, txt, color, size) { this.num(x, y, txt, color, size || 15, 2.6); }
 
   update(dt) {
     const P = this.parts;

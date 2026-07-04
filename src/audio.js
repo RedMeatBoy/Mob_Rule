@@ -122,6 +122,7 @@ export class AudioSystem {
   constructor() {
     this.ctx = null; this.master = null; this.musicGain = null;
     this.muted = false; this.last = new Map();
+    this.voice = null; // speech-synthesis announcer (picked lazily)
     this.playing = false; this.beat = 0; this.nextT = 0; this.interval = null;
     this.intensity = 0; // 0..1, layers in the second melody voice
   }
@@ -139,7 +140,36 @@ export class AudioSystem {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
   }
-  setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.7; }
+  setMuted(m) {
+    this.muted = m;
+    if (this.master) this.master.gain.value = m ? 0 : 0.7;
+    if (m) { try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch (e) {} }
+  }
+
+  // Spoken announcer (Web Speech API — built into the browser, no assets).
+  // Excited and positive: for the pre-readers in the audience.
+  // priority=true interrupts whatever is being said; otherwise a busy
+  // announcer just skips the line (no backlog of stale chatter).
+  say(text, priority = false) {
+    if (this.muted) return;
+    try {
+      if (typeof speechSynthesis === 'undefined') return;
+      if (priority) speechSynthesis.cancel();
+      else if (speechSynthesis.speaking || speechSynthesis.pending) return;
+      const u = new SpeechSynthesisUtterance(text);
+      if (!this.voice) {
+        const vs = speechSynthesis.getVoices() || [];
+        this.voice =
+          vs.find(v => v.lang && v.lang.startsWith('en') && /aria|jenny|zira|samantha|female|google us english/i.test(v.name)) ||
+          vs.find(v => v.lang && v.lang.startsWith('en')) || null;
+      }
+      if (this.voice) u.voice = this.voice;
+      u.rate = 1.06;
+      u.pitch = 1.3;   // bright and upbeat, not scary
+      u.volume = 0.95;
+      speechSynthesis.speak(u);
+    } catch (e) { /* no speech support — game stays fully playable */ }
+  }
 
   tone(f, t, dur, type, vol, dest, slide, vib) {
     if (!this.ctx) return;

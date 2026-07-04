@@ -92,6 +92,7 @@ export class Game {
     this.lastStand = null;
     this.endCause = null;
     this.rescueT = 10;
+    this.acornHintDone = false;
     this.players = [];
     const p1 = new Piper(0, this.arena.w / 2 - 30, this.arena.h / 2, this.save.little[0]);
     this.players.push(p1);
@@ -120,6 +121,7 @@ export class Game {
     this.audio.sfx('wavestart');
     this.audio.intensity = n / 12;
     this.ui.banner(def.boss ? `WAVE ${n} — ${this.bossName(def.boss)}` : `WAVE ${n}`, def.boss ? '#e05c5c' : '#fff');
+    this.audio.say(def.boss ? `Wave ${n}! Here comes the big boss! You can do it!` : `Wave ${n}! Here they come!`, true);
     // Scatter recruitment cages.
     for (let i = 0; i < def.cages; i++) {
       this.cages.push({
@@ -161,6 +163,7 @@ export class Game {
     this.shake(0.7);
     this.audio.sfx('victory');
     this.ui.banner('BOSS SCRAPPED!', '#ffd166');
+    this.audio.say('You did it! The boss is scrapped! Amazing!', true);
     // Bonus egg: 3 random higher-tier recruits.
     for (let i = 0; i < 3; i++) {
       const sp = this.randomSpecies();
@@ -178,6 +181,11 @@ export class Game {
 
   endRun(won, cause) {
     this.endCause = cause || null;
+    this.audio.say(won
+      ? 'Nature wins! Hooray! You saved all the critters!'
+      : cause === 'mobwipe'
+        ? 'Oh no, the mob is gone! Great try! Play again!'
+        : 'Ouch! The piper got bonked! Great try! Play again!', true);
     this.save.bestWave = Math.max(this.save.bestWave, this.waveNum);
     this.save.biggestMob = Math.max(this.save.biggestMob, this.mob.biggest);
     this.save.acorns += this.runStats.acorns;
@@ -225,19 +233,19 @@ export class Game {
 
   applyChoice(c, slot) {
     const p = this.players[slot] || this.players[0];
+    this.fx.notice(p.x, p.y - 34, c.title + '!', '#ffd166', 16);
+    this.audio.say(c.title + '!');
     if (c.kind === 'pack') {
       for (let i = 0; i < c.count; i++) {
         this.mob.add(this, c.species, 1, p.x + randRange(-40, 40), p.y + randRange(20, 60), p.slot);
       }
     } else if (c.kind === 'mobBuff') {
       this.mob.buffs[c.stat] += c.amount;
-      this.fx.num(p.x, p.y - 30, c.title + '!', '#ffd166', 14);
     } else if (c.kind === 'piperBuff') {
       if (c.stat === 'maxhp') { p.maxHp += c.amount; p.hp = p.maxHp; }
       else if (c.stat === 'speed') p.speed *= (1 + c.amount);
       else if (c.stat === 'regen') p.regen += c.amount;
       else if (c.stat === 'charm') p.charm = true;
-      this.fx.num(p.x, p.y - 30, c.title + '!', '#7ec850', 14);
     } else if (c.kind === 'wild') {
       this.mob.wild[c.effect] = true;
       if (c.effect === 'crown') this.mob.recrown(this);
@@ -287,6 +295,7 @@ export class Game {
         }
         if (d2 < 22 * 22 && p.heal(this, 25)) {
           this.snacks.splice(i, 1);
+          this.audio.say('Yummy apple!');
           break;
         }
       }
@@ -394,6 +403,7 @@ export class Game {
           this.lastStand = { t: 12 };
           this.ui.banner('MOB LOST — FREE A CAGE, FAST!', '#e05c5c');
           this.audio.sfx('defeat');
+          this.audio.say('Oh no! Save the mob! Run to a cage, fast!', true);
         } else {
           this.endRun(false, 'mobwipe');
           return;
@@ -429,6 +439,7 @@ export class Game {
         });
         this.ui.banner('WILD CRITTERS SPOTTED!', '#ffd166');
         this.audio.sfx('cage');
+        this.audio.say('Wild critters spotted! Follow the golden arrow!');
       }
     } else {
       this.rescueT = Math.min(this.rescueT, 10);
@@ -537,6 +548,12 @@ export class Game {
         this.acorns(a.val);
         this.audio.sfx('acorn');
         this.fx.sparks(a.x, a.y, 2);
+        this.fx.num(a.x, a.y - 4, `+${a.val} acorn`, '#e8c33a', 11);
+        if (!this.acornHintDone) {
+          this.acornHintDone = true;
+          this.fx.notice(a.x, a.y - 28, 'Acorns unlock NEW critters!', '#ffd166', 16);
+          this.audio.say('You got an acorn! Collect acorns to unlock new critters!');
+        }
         A.release(i);
       }
     }
@@ -557,7 +574,8 @@ export class Game {
           for (let k = 0; k < n; k++) {
             this.mob.add(this, sp, 1, c.x + randRange(-14, 14), c.y + randRange(-14, 14), p.slot);
           }
-          this.fx.num(c.x, c.y - 20, `${n} ${SPECIES[sp].name}s freed!`, '#7ec850', 13);
+          this.fx.notice(c.x, c.y - 20, `${n} ${SPECIES[sp].name}s freed!`, '#7ec850', 15);
+          this.audio.say(c.rescue ? `Hooray! ${n} wild ${SPECIES[sp].name}s join the parade!` : `${n} ${SPECIES[sp].name}s join the parade!`);
           break;
         }
       }

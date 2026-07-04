@@ -18,6 +18,14 @@ crack a cage, arrow points the way) else the run ends with cause 'mobwipe'
 piper HP matters before the mob dies; boss stomp/broom sweep deal 0.6-0.65x
 to critters so one AOE can't erase the packed orbit.
 
+Round-5 (Brad feedback, post-victory): fx.notice() = 2.6s readable popups
+(cage frees, crossroads cards, acorn hint) vs 0.55s fx.num; audio.say() =
+Web Speech announcer (bright/positive, priority lines interrupt, chatter
+lines skip-if-busy; no-ops headless) for waves, boss, cards, cages, rescue,
+win/lose, first acorn — for the pre-reading 5yo; ambient mob chatter
+(random species voice every 2-4s); acorn pickups show '+N acorn' and the
+first of each run explains unlocks.
+
 Round-4 (Brad feedback): RESCUE DRIP — mob < 5 spawns a golden rescue cage
 (4-5 critters) within ~10s then every 30s, with a gold HUD arrow, so a
 shrinking mob is recoverable instead of a death spiral. Health scarcer:
