@@ -248,7 +248,7 @@ console.log('G) Co-op: split mob + down/revive:');
   // Both down -> game over.
   for (const p of g.players) { p.invuln = 0; p.hurt(g, 999, null); p.invuln = 0; p.hurt(g, 999, null); }
   check(g.state === 'gameover', 'both down -> the mob scatters', g.state);
-  const saved = JSON.parse(store.get('mob_rule_v1'));
+  const saved = JSON.parse(store.get('mob_rule_slot_0'));
   check(saved.acorns >= 0 && saved.bestWave >= 1, 'meta progress persisted');
 }
 
@@ -503,6 +503,67 @@ console.log('M) Round 6: BUNNYTRON + acorn-fed growth:');
   const rBig = g.mob.orbitSlot(0, 10, 0).r;
   const rSmall = small.mob.orbitSlot(0, 10, 0).r;
   check(rBig > rSmall, 'orbit widens as the mob grows', `${rSmall.toFixed(0)} -> ${rBig.toFixed(0)}`);
+}
+
+console.log('N) Phase A: save slots + BAM & VIVI:');
+{
+  const { CHARACTERS } = await load('src/data.js');
+  check(CHARACTERS.length === 3 && CHARACTERS[1].id === 'bam' && CHARACTERS[2].id === 'vivi', 'three characters exist');
+  // Save slots: legacy migrates to slot 0; slots are independent; delete works.
+  store.clear();
+  store.set('mob_rule_v1', JSON.stringify({ acorns: 777, bestWave: 9 }));
+  const g = new Game(null);
+  check(g.state === 'saves', 'game boots to the save-file screen');
+  check(!!store.get('mob_rule_slot_0'), 'legacy save migrated to slot 1');
+  g.chooseSlot(0);
+  check(g.state === 'title' && g.save.acorns === 777, 'choosing a slot loads it', `acorns=${g.save.acorns}`);
+  g.chooseSlot(1);
+  check(g.save.acorns === 0, 'other slots start fresh');
+  g.save.acorns = 55; g.persist();
+  g.chooseSlot(0);
+  check(g.save.acorns === 777, 'slots do not bleed into each other');
+  g.deleteSlot(1);
+  check(g.loadSlot(1) === null, 'deleteSlot wipes a slot');
+  check(g.loadSlot(0).acorns === 777, 'deleting one slot leaves the others');
+}
+{
+  // BAM: taps send THREE, then a cooldown blocks the next tap.
+  store.clear();
+  const g = new Game(null);
+  g.chooseSlot(0);
+  g.save.chars = [1, 0]; // BAM
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  check(p.char.id === 'bam' && p.speed < 175, 'BAM is slower afoot', `spd=${p.speed}`);
+  g.input.keys.add('Space'); g.frame(1 / 60); g.input.keys.delete('Space');
+  check(g.mob.counts(0).attack === 3, 'BAM sends THREE at once', `out=${g.mob.counts(0).attack}`);
+  g.frame(1 / 60);
+  g.input.keys.add('Space'); g.frame(1 / 60); g.input.keys.delete('Space');
+  check(g.mob.counts(0).attack === 3, 'drumroll cooldown blocks the next tap', `out=${g.mob.counts(0).attack}`);
+  const hunter = g.mob.list.find(c => c.duty === 'attack');
+  check(hunter && hunter.mods && hunter.mods.hunterAspd > 1, 'BAM hunters carry the war-beat mod');
+}
+{
+  // VIVI: slower single sends, fast recalls, lullaby slow on the wall.
+  store.clear();
+  const g = new Game(null);
+  g.chooseSlot(0);
+  g.save.chars = [2, 0]; // VIVI
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  check(p.char.id === 'vivi', 'VIVI selected');
+  g.input.keys.add('Space'); g.frame(1 / 60); g.input.keys.delete('Space');
+  check(g.mob.counts(0).attack === 1, 'VIVI sends one at a time');
+  const h = g.mob.list.find(c => c.duty === 'attack');
+  check(h && h.mods && h.mods.hunterDmg < 1, 'VIVI hunters hit softer (mod present)');
+  // Lullaby wall: a melee shield critter's nibble slows the bot.
+  const e = g.enemies.spawnNow(g, 'dustbot', p.x + 40, p.y);
+  e.hp = 1e9;
+  let slowed = false;
+  for (let i = 0; i < 60 * 5 && !slowed; i++) { g.frame(1 / 60); slowed = e.slowT > 0.5; }
+  check(slowed, 'lullaby wall entrances robots that touch it');
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);

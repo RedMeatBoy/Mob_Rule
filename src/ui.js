@@ -2,7 +2,7 @@
 // title/end/pause screens. Every screen works on keyboard and controller.
 
 import { clamp, lerp } from './pool.js';
-import { SPECIES, SPECIES_IDS, WAVES, UNLOCK_ORDER, MOB_CAP, TIPS, DEFEAT_LINES, VICTORY_LINES } from './data.js';
+import { SPECIES, SPECIES_IDS, WAVES, UNLOCK_ORDER, MOB_CAP, TIPS, DEFEAT_LINES, VICTORY_LINES, CHARACTERS } from './data.js';
 import { statFor, drawCrown } from './critters.js';
 import { PIPER_COLORS } from './piper.js';
 import { VIEW_W, VIEW_H } from './game.js';
@@ -81,6 +81,52 @@ export class UI {
     this.lastMob = mc;
 
     switch (g.state) {
+      case 'saves': {
+        // Pick one of 3 save files. Delete needs TWO spoken confirmations.
+        if (this.saveIdx == null) { this.saveIdx = 0; this.saveBtn = 0; this.saveMode = 'pick'; }
+        // Device binding, same as title.
+        if (!inp.deviceFor(0)) {
+          for (const dev of inp.devices.values()) {
+            if (dev.connected && (dev.pressed('confirm') || dev.pressed('whistle'))) { inp.assign(0, dev.id); break; }
+          }
+          if (!inp.deviceFor(0) && inp.keys.size > 0) inp.assign(0, 'kb1');
+        }
+        if (this.saveMode === 'pick') {
+          if (inp.anyMenu('left')) { this.saveIdx = (this.saveIdx + 2) % 3; this.saveBtn = 0; g.audio.sfx('uiMove'); this.saySlot(g); }
+          if (inp.anyMenu('right')) { this.saveIdx = (this.saveIdx + 1) % 3; this.saveBtn = 0; g.audio.sfx('uiMove'); this.saySlot(g); }
+          if (inp.anyMenu('up') || inp.anyMenu('down')) {
+            if (g.loadSlot(this.saveIdx)) { this.saveBtn = 1 - this.saveBtn; g.audio.sfx('uiMove'); }
+          }
+          if (inp.anyPressed('confirm')) {
+            g.audio.ensure();
+            g.audio.sfx('uiPick');
+            if (this.saveBtn === 1 && g.loadSlot(this.saveIdx)) {
+              this.saveMode = 'confirm1'; this.confirmYes = false;
+              g.audio.say('Delete this save?', true);
+            } else {
+              g.chooseSlot(this.saveIdx);
+              g.audio.say('Save file ' + (this.saveIdx + 1) + '. Lets play!', true);
+            }
+          }
+        } else {
+          // confirm1 / confirm2 dialogs: NO is always the default.
+          if (inp.anyMenu('left') || inp.anyMenu('right')) { this.confirmYes = !this.confirmYes; g.audio.sfx('uiMove'); }
+          if (inp.anyPressed('back')) { this.saveMode = 'pick'; g.audio.sfx('uiMove'); }
+          else if (inp.anyPressed('confirm')) {
+            g.audio.sfx('uiPick');
+            if (!this.confirmYes) { this.saveMode = 'pick'; }
+            else if (this.saveMode === 'confirm1') {
+              this.saveMode = 'confirm2'; this.confirmYes = false;
+              g.audio.say('It will be gone forever! Really delete?', true);
+            } else {
+              g.deleteSlot(this.saveIdx);
+              this.saveMode = 'pick'; this.saveBtn = 0;
+              g.audio.say('The save is gone. All clean!', true);
+            }
+          }
+        }
+        break;
+      }
       case 'title': {
         for (const p of this.titleParade) {
           p.x += p.sp2 * dt;
@@ -98,19 +144,33 @@ export class UI {
         }
         const join = inp.joinPress();
         if (join) { inp.assign(1, join); g.audio.sfx('recruit'); }
-        const n = 4;
+        const n = 7;
         if (inp.anyMenu('up')) { this.menuIdx = (this.menuIdx + n - 1) % n; g.audio.sfx('uiMove'); }
         if (inp.anyMenu('down')) { this.menuIdx = (this.menuIdx + 1) % n; g.audio.sfx('uiMove'); }
-        if (inp.anyMenu('left') || inp.anyMenu('right')) {
-          if (this.menuIdx === 1) { g.save.little[0] = !g.save.little[0]; g.persist(); g.audio.sfx('uiMove'); }
-          if (this.menuIdx === 2) { g.save.little[1] = !g.save.little[1]; g.persist(); g.audio.sfx('uiMove'); }
+        const dir = inp.anyMenu('right') ? 1 : inp.anyMenu('left') ? -1 : 0;
+        if (dir) {
+          if (this.menuIdx === 1 || this.menuIdx === 2) {
+            const pl = this.menuIdx - 1;
+            g.save.chars[pl] = ((g.save.chars[pl] || 0) + dir + CHARACTERS.length) % CHARACTERS.length;
+            g.persist(); g.audio.sfx('uiMove');
+            g.audio.say(CHARACTERS[g.save.chars[pl]].name + '!', true);
+          }
+          if (this.menuIdx === 3) { g.save.little[0] = !g.save.little[0]; g.persist(); g.audio.sfx('uiMove'); }
+          if (this.menuIdx === 4) { g.save.little[1] = !g.save.little[1]; g.persist(); g.audio.sfx('uiMove'); }
         }
         if (inp.anyPressed('confirm')) {
           g.audio.ensure();
           if (this.menuIdx === 0) { if (inp.deviceFor(0)) g.startRun(); }
-          else if (this.menuIdx === 1) { g.save.little[0] = !g.save.little[0]; g.persist(); }
-          else if (this.menuIdx === 2) { g.save.little[1] = !g.save.little[1]; g.persist(); }
-          else g.setMuted(!g.audio.muted);
+          else if (this.menuIdx === 1 || this.menuIdx === 2) {
+            const pl = this.menuIdx - 1;
+            g.save.chars[pl] = ((g.save.chars[pl] || 0) + 1) % CHARACTERS.length;
+            g.persist();
+            g.audio.say(CHARACTERS[g.save.chars[pl]].name + '!', true);
+          }
+          else if (this.menuIdx === 3) { g.save.little[0] = !g.save.little[0]; g.persist(); }
+          else if (this.menuIdx === 4) { g.save.little[1] = !g.save.little[1]; g.persist(); }
+          else if (this.menuIdx === 5) g.setMuted(!g.audio.muted);
+          else { g.state = 'saves'; this.saveMode = 'pick'; this.saveBtn = 0; }
           g.audio.sfx('uiPick');
         }
         break;
@@ -155,9 +215,18 @@ export class UI {
   }
 
   // ============ RENDER ============
+  // Speak the focused save slot for the pre-readers.
+  saySlot(g) {
+    const s = g.loadSlot(this.saveIdx);
+    g.audio.say(s
+      ? 'Save file ' + (this.saveIdx + 1) + '. Best wave ' + (s.bestWave || 0) + '. ' + (s.acorns || 0) + ' acorns.'
+      : 'Save file ' + (this.saveIdx + 1) + '. Empty. A fresh start!');
+  }
+
   render(ctx) {
     const g = this.g;
     switch (g.state) {
+      case 'saves': this.renderSaves(ctx); break;
       case 'title': this.renderTitle(ctx); break;
       case 'run': this.renderWorld(ctx); this.renderHUD(ctx); if (g.paused) this.renderPause(ctx); break;
       case 'crossroads': this.renderWorld(ctx); this.renderCrossroads(ctx); break;
@@ -652,6 +721,98 @@ export class UI {
     });
   }
 
+  renderSaves(ctx) {
+    const g = this.g;
+    const grd = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    grd.addColorStop(0, '#8fd0ff');
+    grd.addColorStop(0.6, '#c9ecff');
+    grd.addColorStop(0.6, '#79b562');
+    grd.addColorStop(1, '#5a8a4a');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+    ctx.font = `bold 56px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(30,45,20,0.85)'; ctx.lineWidth = 8;
+    ctx.strokeText('PICK A SAVE FILE', VIEW_W / 2, 110);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText('PICK A SAVE FILE', VIEW_W / 2, 110);
+
+    const cw = 320, chh = 340, gap = 40;
+    const x0 = VIEW_W / 2 - (cw * 3 + gap * 2) / 2;
+    for (let i = 0; i < 3; i++) {
+      const s = g.loadSlot(i);
+      const x = x0 + i * (cw + gap), y = 170;
+      const sel = this.saveIdx === i;
+      ctx.fillStyle = sel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.65)';
+      rr(ctx, x, y, cw, chh, 18); ctx.fill();
+      if (sel) { ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 6; rr(ctx, x, y, cw, chh, 18); ctx.stroke(); }
+      ctx.fillStyle = '#3a5a2e';
+      ctx.font = `bold 30px ${FONT}`;
+      ctx.fillText(`SAVE ${i + 1}`, x + cw / 2, y + 52);
+      if (s) {
+        ctx.font = `bold 19px ${FONT}`;
+        ctx.fillStyle = '#4a4a3a';
+        ctx.fillText(`🌰 ${s.acorns} acorns`, x + cw / 2, y + 110);
+        ctx.fillText(`best wave: ${s.bestWave || 0} / 12`, x + cw / 2, y + 142);
+        ctx.fillText(`biggest mob: ${s.biggestMob || 0}`, x + cw / 2, y + 174);
+        ctx.fillText(`wins: ${s.wins || 0}`, x + cw / 2, y + 206);
+        // PLAY / DELETE buttons.
+        const by = y + 245;
+        for (let b = 0; b < 2; b++) {
+          const on = sel && this.saveBtn === b;
+          ctx.fillStyle = b === 0 ? (on ? '#7ec850' : '#a8cc90') : (on ? '#e05c5c' : '#d8a8a0');
+          rr(ctx, x + 40, by + b * 44, cw - 80, 36, 9); ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = `bold 19px ${FONT}`;
+          ctx.fillText(b === 0 ? '▶ PLAY' : '🗑 DELETE', x + cw / 2, by + b * 44 + 25);
+        }
+      } else {
+        ctx.font = `bold 22px ${FONT}`;
+        ctx.fillStyle = '#7a9a6a';
+        ctx.fillText('empty', x + cw / 2, y + 140);
+        ctx.font = `17px ${FONT}`;
+        ctx.fillText('a fresh start!', x + cw / 2, y + 172);
+        const on = sel;
+        ctx.fillStyle = on ? '#7ec850' : '#a8cc90';
+        rr(ctx, x + 40, y + 245, cw - 80, 36, 9); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold 19px ${FONT}`;
+        ctx.fillText('▶ NEW GAME', x + cw / 2, y + 270);
+      }
+    }
+    ctx.font = `bold 16px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText('◀ ▶ pick a file · ▲ ▼ play or delete · confirm with your button', VIEW_W / 2, 560);
+
+    // Double-confirm delete dialogs.
+    if (this.saveMode !== 'pick') {
+      ctx.fillStyle = 'rgba(20,15,10,0.75)';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      const second = this.saveMode === 'confirm2';
+      ctx.fillStyle = '#fff8ec';
+      rr(ctx, VIEW_W / 2 - 320, 240, 640, 240, 20); ctx.fill();
+      ctx.strokeStyle = second ? '#e05c5c' : '#e8a33a'; ctx.lineWidth = 6;
+      rr(ctx, VIEW_W / 2 - 320, 240, 640, 240, 20); ctx.stroke();
+      ctx.fillStyle = second ? '#c53030' : '#8a5a1a';
+      ctx.font = `bold 30px ${FONT}`;
+      ctx.fillText(second ? '⚠ It will be gone FOREVER!' : `Delete save ${this.saveIdx + 1}?`, VIEW_W / 2, 300);
+      ctx.font = `bold 22px ${FONT}`;
+      ctx.fillStyle = '#5a4a3a';
+      ctx.fillText(second ? 'Really delete?' : 'All its acorns and critters will disappear.', VIEW_W / 2, 344);
+      for (let b = 0; b < 2; b++) {
+        const yes = b === 1;
+        const on = this.confirmYes === yes;
+        ctx.fillStyle = yes ? (on ? '#e05c5c' : '#d8b0a8') : (on ? '#7ec850' : '#b0cc9c');
+        rr(ctx, VIEW_W / 2 - 250 + b * 260, 385, 240, 60, 12); ctx.fill();
+        if (on) { ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 4; rr(ctx, VIEW_W / 2 - 250 + b * 260, 385, 240, 60, 12); ctx.stroke(); }
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold 24px ${FONT}`;
+        ctx.fillText(yes ? 'YES, delete' : 'NO! Keep it', VIEW_W / 2 - 130 + b * 260, 424);
+      }
+    }
+  }
+
   renderTitle(ctx) {
     const g = this.g;
     // Meadow sky.
@@ -690,27 +851,39 @@ export class UI {
     ctx.textAlign = 'center';
     ctx.fillText('lead the critters. flood the lawn. unplug the Tidy Empire.', VIEW_W / 2, 215);
 
+    const c0 = CHARACTERS[g.save.chars[0] || 0], c1 = CHARACTERS[g.save.chars[1] || 0];
     const items = [
       'MARCH!  (start run)',
+      `P1 plays: ◀ ${c0.emoji} ${c0.name} ▶`,
+      `P2 plays: ◀ ${c1.emoji} ${c1.name} ▶`,
       `P1 Little Piper mode: ${g.save.little[0] ? 'ON ★' : 'off'}`,
       `P2 Little Piper mode: ${g.save.little[1] ? 'ON ★' : 'off'}`,
       `Sound: ${g.audio.muted ? 'OFF' : 'ON'}`,
+      `SAVE FILES  (playing save ${(g.slotIdx || 0) + 1})`,
     ];
     items.forEach((s, i) => {
-      ctx.font = `bold ${i === 0 ? 30 : 20}px ${FONT}`;
+      ctx.font = `bold ${i === 0 ? 28 : 18}px ${FONT}`;
       ctx.fillStyle = this.menuIdx === i ? '#fff' : 'rgba(255,255,255,0.72)';
+      const y = 268 + i * 40 + (i > 0 ? 8 : 0);
       if (this.menuIdx === i) {
         ctx.strokeStyle = 'rgba(30,45,20,0.6)'; ctx.lineWidth = 5;
-        ctx.strokeText((i === 0 ? '🐸 ' : '') + s, VIEW_W / 2, 300 + i * 52);
+        ctx.strokeText((i === 0 ? '🐸 ' : '') + s, VIEW_W / 2, y);
       }
-      ctx.fillText((this.menuIdx === i && i !== 0 ? '▶ ' : i === 0 && this.menuIdx === 0 ? '🐸 ' : '') + s, VIEW_W / 2, 300 + i * 52);
+      ctx.fillText((this.menuIdx === i && i !== 0 ? '▶ ' : i === 0 && this.menuIdx === 0 ? '🐸 ' : '') + s, VIEW_W / 2, y);
     });
+    // One-line blurb for the highlighted character.
+    if (this.menuIdx === 1 || this.menuIdx === 2) {
+      const cc = this.menuIdx === 1 ? c0 : c1;
+      ctx.font = `italic 15px ${FONT}`;
+      ctx.fillStyle = '#fff8d0';
+      ctx.fillText(cc.desc, VIEW_W / 2, 268 + 7 * 40 + 22);
+    }
 
     ctx.font = `bold 14px ${FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     const d0 = g.input.deviceFor(0), d1 = g.input.deviceFor(1);
-    ctx.fillText(d0 ? `P1: ${d0.label}` : 'P1: press a button to claim a device', VIEW_W / 2, 530);
-    ctx.fillText(d1 ? `P2: ${d1.label} — co-op ON` : 'P2: press a button on another device to join', VIEW_W / 2, 552);
+    ctx.fillText(d0 ? `P1: ${d0.label}` : 'P1: press a button to claim a device', VIEW_W / 2, 596 - 62);
+    ctx.fillText(d1 ? `P2: ${d1.label} — co-op ON` : 'P2: press a button on another device to join', VIEW_W / 2, 596 - 42);
 
     // Unlock strip.
     let ux = VIEW_W / 2 - (SPECIES_IDS.length * 34) / 2;

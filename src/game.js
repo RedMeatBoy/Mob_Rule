@@ -2,7 +2,7 @@
 // crossroads picks, camera, meta unlocks.
 
 import { Pool, clamp, lerp, dist2, randRange, weightedPick, mulberry32 } from './pool.js';
-import { SPECIES, SPECIES_IDS, WAVES, CHOICES, UNLOCK_ORDER, MOB_CAP } from './data.js';
+import { SPECIES, SPECIES_IDS, WAVES, CHOICES, UNLOCK_ORDER, MOB_CAP, CHARACTERS } from './data.js';
 import { MobSystem } from './critters.js';
 import { EnemySystem } from './enemies.js';
 import { Piper } from './piper.js';
@@ -12,7 +12,9 @@ import { FX } from './fx.js';
 import { UI } from './ui.js';
 
 const STEP = 1 / 60;
-const SAVE_KEY = 'mob_rule_v1';
+const LEGACY_KEY = 'mob_rule_v1';
+const SLOT_KEY = i => 'mob_rule_slot_' + i;
+export const SLOT_COUNT = 3;
 export const VIEW_W = 1280, VIEW_H = 720;
 
 export class Game {
@@ -27,7 +29,7 @@ export class Game {
     this.enemies = new EnemySystem(this.arena.w, this.arena.h);
     this.ui = new UI(this);
 
-    this.state = 'title'; // title|run|crossroads|gameover|victory|help|(pause overlay)
+    this.state = 'saves'; // saves|title|run|crossroads|gameover|victory|(pause overlay)
     this.paused = false;
     this.pauseReason = '';
     this.players = [];
@@ -51,29 +53,53 @@ export class Game {
     this.snacks = [];
     this.rng = Math.random;
 
-    this.save = this.load();
+    this.slotIdx = null;
+    this.migrateLegacy();
+    this.save = this.defaultSave(); // placeholder until a save file is chosen
     this.fx.shakeEnabled = this.save.settings.shake;
     this.audio.setMuted(this.save.settings.muted);
     this.decor = [];
     this.buildDecor();
   }
 
-  load() {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        return {
-          acorns: s.acorns || 0, bestWave: s.bestWave || 0, wins: s.wins || 0,
-          biggestMob: s.biggestMob || 0,
-          settings: { muted: !!(s.settings && s.settings.muted), shake: s.settings ? s.settings.shake !== false : true },
-          little: s.little || [false, false],
-        };
-      }
-    } catch (e) {}
-    return { acorns: 0, bestWave: 0, wins: 0, biggestMob: 0, settings: { muted: false, shake: true }, little: [false, false] };
+  defaultSave() {
+    return { acorns: 0, bestWave: 0, wins: 0, biggestMob: 0, settings: { muted: false, shake: true }, little: [false, false], chars: [0, 0] };
   }
-  persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) {} }
+  loadSlot(i) {
+    try {
+      const raw = localStorage.getItem(SLOT_KEY(i));
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      const d = this.defaultSave();
+      return {
+        ...d, ...s,
+        settings: { ...d.settings, ...(s.settings || {}) },
+        little: s.little || [false, false],
+        chars: s.chars || [0, 0],
+      };
+    } catch (e) { return null; }
+  }
+  // One-time: an old single-file save becomes save file 1.
+  migrateLegacy() {
+    try {
+      for (let i = 0; i < SLOT_COUNT; i++) if (localStorage.getItem(SLOT_KEY(i))) return;
+      const raw = localStorage.getItem(LEGACY_KEY);
+      if (raw) localStorage.setItem(SLOT_KEY(0), raw);
+    } catch (e) {}
+  }
+  chooseSlot(i) {
+    this.slotIdx = i;
+    this.save = this.loadSlot(i) || this.defaultSave();
+    this.persist();
+    this.fx.shakeEnabled = this.save.settings.shake;
+    this.audio.setMuted(this.save.settings.muted);
+    this.state = 'title';
+  }
+  deleteSlot(i) { try { localStorage.removeItem(SLOT_KEY(i)); } catch (e) {} }
+  persist() {
+    if (this.slotIdx == null) return;
+    try { localStorage.setItem(SLOT_KEY(this.slotIdx), JSON.stringify(this.save)); } catch (e) {}
+  }
   setMuted(m) { this.audio.setMuted(m); this.save.settings.muted = m; this.persist(); }
   setShake(v) { this.fx.shakeEnabled = v; this.save.settings.shake = v; this.persist(); }
   unlocked(sp) { return SPECIES[sp].unlock <= this.save.acorns; }
@@ -82,6 +108,7 @@ export class Game {
 
   // ---------- run flow ----------
   startRun() {
+    if (this.slotIdx == null) { this.slotIdx = 0; this.save = this.loadSlot(0) || this.defaultSave(); }
     this.mob = new MobSystem();
     this.enemies.clear();
     this.proj.clear(); this.acornsList.clear();
@@ -94,11 +121,12 @@ export class Game {
     this.rescueT = 10;
     this.acornHintDone = false;
     this.players = [];
-    const p1 = new Piper(0, this.arena.w / 2 - 30, this.arena.h / 2, this.save.little[0]);
+    const p1 = new Piper(0, this.arena.w / 2 - 30, this.arena.h / 2, this.save.little[0], CHARACTERS[this.save.chars[0] || 0]);
     this.players.push(p1);
     if (this.input.deviceFor(1)) {
-      this.players.push(new Piper(1, this.arena.w / 2 + 30, this.arena.h / 2, this.save.little[1]));
+      this.players.push(new Piper(1, this.arena.w / 2 + 30, this.arena.h / 2, this.save.little[1], CHARACTERS[this.save.chars[1] || 0]));
     }
+    this.audio.lead = CHARACTERS[this.save.chars[0] || 0].lead;
     // Starting mob: a sampler platter — melee, ranged, and one goat.
     const starters = ['frog', 'frog', 'duck', 'duck', 'goat'];
     for (const sp of starters) {
@@ -373,14 +401,20 @@ export class Game {
       const inp = this.input.move(p.slot);
       p.update(dt, this, { x: inp.x, y: inp.y });
       if (p.dead || p.downed) continue;
+      const ch = p.char;
       if (this.input.pressed(p.slot, 'whistle')) {
-        if (this.mob.sendOne(this, p)) { p.whistleAnim = 0.3; this.fx.notes(p.x, p.y - 24, 2); }
+        if (p.sendCd <= 0) {
+          let sent = 0;
+          for (let k = 0; k < (ch.sendCount || 1); k++) if (this.mob.sendOne(this, p)) sent++;
+          if (sent) { p.whistleAnim = 0.35; this.fx.notes(p.x, p.y - 24, 1 + sent); }
+          if (ch.sendCd) p.sendCd = ch.sendCd;
+        }
         p.sendAcc = -0.25; // grace before the hold-stream kicks in
-      } else if (this.input.down(p.slot, 'whistle')) {
+      } else if (ch.sendStream && this.input.down(p.slot, 'whistle')) {
         p.sendAcc += dt;
-        while (p.sendAcc >= 0.14) {
-          p.sendAcc -= 0.14;
-          if (this.mob.sendOne(this, p)) p.whistleAnim = 0.3;
+        while (p.sendAcc >= ch.sendStream) {
+          p.sendAcc -= ch.sendStream;
+          if (this.mob.sendOne(this, p)) p.whistleAnim = 0.35;
         }
       } else p.sendAcc = 0;
       if (this.input.pressed(p.slot, 'recall')) {
@@ -388,8 +422,8 @@ export class Game {
         p.recallAcc = -0.25;
       } else if (this.input.down(p.slot, 'recall')) {
         p.recallAcc += dt;
-        while (p.recallAcc >= 0.11) {
-          p.recallAcc -= 0.11;
+        while (p.recallAcc >= (ch.recallStream || 0.11)) {
+          p.recallAcc -= (ch.recallStream || 0.11);
           this.mob.recallOne(this, p);
         }
       } else p.recallAcc = 0;

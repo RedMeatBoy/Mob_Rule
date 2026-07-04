@@ -2,16 +2,19 @@
 // the mob surges. That's the whole verb set, and it's enough.
 
 import { clamp, lerp } from './pool.js';
+import { CHARACTERS } from './data.js';
 
 export const PIPER_COLORS = ['#e05c5c', '#5aa9ff'];
 
 export class Piper {
-  constructor(slot, x, y, little) {
+  constructor(slot, x, y, little, chr) {
     this.slot = slot;
     this.little = !!little;
+    this.char = chr || CHARACTERS[0];
+    this.sendCd = 0;
     this.color = PIPER_COLORS[slot];
     this.x = x; this.y = y; this.px = x; this.py = y;
-    this.speed = 175;
+    this.speed = 175 * (this.char.speedMul || 1);
     this.maxHp = little ? 140 : 100;
     this.hp = this.maxHp;
     this.regen = little ? 1.2 : 0.7;   // HP per second (pauses briefly after a hit)
@@ -30,6 +33,7 @@ export class Piper {
   update(dt, game, inp) {
     this.px = this.x; this.py = this.y;
     this.invuln = Math.max(0, this.invuln - dt);
+    this.sendCd = Math.max(0, this.sendCd - dt);
     this.whistleAnim = Math.max(0, this.whistleAnim - dt);
     if (this.dead || this.downed) { this.rallyT = 0; return; }
 
@@ -142,22 +146,74 @@ export class Piper {
     // Head.
     ctx.fillStyle = '#e8c8a0';
     ctx.beginPath(); ctx.arc(0, -12, 6.5, 0, 6.29); ctx.fill();
-    // Big band hat.
-    ctx.fillStyle = this.color;
-    ctx.fillRect(-5, -25, 10, 9);
-    ctx.fillStyle = '#ffd966';
-    ctx.fillRect(-5, -18, 10, 2.4);
-    ctx.beginPath(); ctx.arc(0, -25, 3, 0, 6.29); ctx.fill(); // pom
-    // Eye.
-    ctx.fillStyle = '#2b2b2b';
-    ctx.fillRect(2.5, -13, 2, 2.4);
-    // Flute (out while whistling).
-    if (this.whistleAnim > 0) {
-      ctx.fillStyle = '#c9a05a';
-      ctx.fillRect(4, -11, 12, 2.6);
-      ctx.fillStyle = '#8a6b45';
-      ctx.fillRect(7, -11, 1.6, 2.6);
-      ctx.fillRect(11, -11, 1.6, 2.6);
+    if (this.char.id === 'vivi') {
+      // Pink dress over the jacket, twirl-ready.
+      ctx.fillStyle = '#ff9ec4';
+      ctx.beginPath(); ctx.moveTo(-7, -5); ctx.lineTo(7, -5); ctx.lineTo(10, 7); ctx.lineTo(-10, 7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff7eb0';
+      ctx.fillRect(-7, -6, 14, 3);
+      // Hair with two big bows.
+      ctx.fillStyle = '#8a5a3a';
+      ctx.beginPath(); ctx.arc(0, -13, 7.2, 3.3, 6.2); ctx.fill();
+      for (const bx of [-6, 6]) {
+        ctx.fillStyle = '#ff5c9e';
+        ctx.beginPath(); ctx.ellipse(bx - 2, -18, 2.7, 1.9, -0.5, 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(bx + 2, -18, 2.7, 1.9, 0.5, 0, 6.29); ctx.fill();
+        ctx.fillStyle = '#ffd0e4';
+        ctx.beginPath(); ctx.arc(bx, -18, 1.4, 0, 6.29); ctx.fill();
+      }
+      // Eye + smile.
+      ctx.fillStyle = '#2b2b2b';
+      ctx.fillRect(2.5, -13, 2, 2.4);
+      // Violin (out while playing).
+      if (this.whistleAnim > 0) {
+        ctx.fillStyle = '#a06a3a';
+        ctx.beginPath(); ctx.ellipse(8, -10, 4, 5.5, 0.4, 0, 6.29); ctx.fill();
+        ctx.fillStyle = '#6a4a2a';
+        ctx.fillRect(9, -18, 2, 8);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(3, -16); ctx.lineTo(14, -6); ctx.stroke();
+      }
+    } else if (this.char.id === 'bam') {
+      // Backwards cap.
+      ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(0, -14.5, 6.5, 3.14, 6.29); ctx.fill();
+      ctx.fillRect(-9, -15.5, 5, 3);
+      // Eye.
+      ctx.fillStyle = '#2b2b2b';
+      ctx.fillRect(2.5, -13, 2, 2.4);
+      // Marching drum on his belly.
+      ctx.fillStyle = '#efe6d4';
+      ctx.beginPath(); ctx.ellipse(6, -1, 5, 6, 0, 0, 6.29); ctx.fill();
+      ctx.strokeStyle = '#c9a05a'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.ellipse(6, -1, 5, 6, 0, 0, 6.29); ctx.stroke();
+      ctx.strokeStyle = '#e05c5c';
+      ctx.beginPath(); ctx.moveTo(2, -5); ctx.lineTo(10, 3); ctx.moveTo(10, -5); ctx.lineTo(2, 3); ctx.stroke();
+      // Drumsticks flail while drumming.
+      if (this.whistleAnim > 0) {
+        ctx.strokeStyle = '#c9a05a'; ctx.lineWidth = 2;
+        const w = Math.sin(this.walk * 4) * 3;
+        ctx.beginPath(); ctx.moveTo(2, -9); ctx.lineTo(8, -15 + w); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(8, -9); ctx.lineTo(14, -14 - w); ctx.stroke();
+      }
+    } else {
+      // Big band hat.
+      ctx.fillStyle = this.color;
+      ctx.fillRect(-5, -25, 10, 9);
+      ctx.fillStyle = '#ffd966';
+      ctx.fillRect(-5, -18, 10, 2.4);
+      ctx.beginPath(); ctx.arc(0, -25, 3, 0, 6.29); ctx.fill(); // pom
+      // Eye.
+      ctx.fillStyle = '#2b2b2b';
+      ctx.fillRect(2.5, -13, 2, 2.4);
+      // Flute (out while whistling).
+      if (this.whistleAnim > 0) {
+        ctx.fillStyle = '#c9a05a';
+        ctx.fillRect(4, -11, 12, 2.6);
+        ctx.fillStyle = '#8a6b45';
+        ctx.fillRect(7, -11, 1.6, 2.6);
+        ctx.fillRect(11, -11, 1.6, 2.6);
+      }
     }
     ctx.restore();
     ctx.globalAlpha = 1;

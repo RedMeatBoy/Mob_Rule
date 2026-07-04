@@ -18,6 +18,18 @@ crack a cage, arrow points the way) else the run ends with cause 'mobwipe'
 piper HP matters before the mob dies; boss stomp/broom sweep deal 0.6-0.65x
 to critters so one AOE can't erase the packed orbit.
 
+Phase A (Brad's expansion plan): 3 save slots (localStorage mob_rule_slot_0..2,
+legacy mob_rule_v1 auto-migrates to slot 0; game boots to 'saves' state;
+delete = double confirm, both spoken, NO is default). CHARACTERS in data.js:
+pip (baseline), bam (send 3 + 1.5s cd, hunterAspd 1.2, nibbleMul 0.8, speed
+0.88), vivi (recallStream 0.06, recallRush 2.5, shieldSlow 1.2, hunterDmg
+0.85, sendStream 0.2). Mods ride on critters (c.mods = owner piper.char);
+atkCad() centralizes cadence. audio.lead: bam doubles kicks, vivi saw lead.
+Sim: all 3 chars median 9 IN BAND (tests/simulate.mjs N runs pip|bam|vivi).
+Sister editions on the same GitHub origin: Mob_Rule_Upgraded (Phase B) and
+Mob_Rule_Extended (Phase C) — localStorage keys MUST stay namespaced per
+edition to avoid cross-save contamination.
+
 Round-6 (Brad feedback): final boss reskinned to BUNNYTRON, giant pink robot
 bunny (same id 'supervisor', same stomp/projectile/summon moveset) + carrot
 bombs: telegraphed AOE (enemies.bombs, 1.25s fall, r92, aimed at random

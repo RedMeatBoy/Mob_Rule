@@ -224,3 +224,29 @@ export const TIPS = [
   'Turtles up front, ducks in the back. Or all bees. All bees works.',
 ];
 export const MERGE_LINES = ['EVOLVED!', 'BIG UPGRADE!', 'PROMOTION!', 'ASCENDED!'];
+
+// ---- Playable characters. Same two buttons, different dials on the
+// attack-vs-shield economy. All numbers here so balance sims can sweep them.
+export const CHARACTERS = [
+  {
+    id: 'pip', name: 'PIP THE PIPER', instrument: 'flute', emoji: '🎵',
+    desc: 'Steady and true. One out, one home.',
+    sendCount: 1, sendCd: 0, sendStream: 0.14, recallStream: 0.11,
+    hunterDmg: 1, hunterAspd: 1, nibbleMul: 1, speedMul: 1,
+    recallRush: 1, shieldSlow: 0, lead: null, sfxSend: 'whistle',
+  },
+  {
+    id: 'bam', name: 'BAM THE DRUMMER', instrument: 'drum', emoji: '🥁',
+    desc: 'DRUMROLL! Sends THREE hunters at once, and they fight faster.',
+    sendCount: 3, sendCd: 1.5, sendStream: 0, recallStream: 0.11,
+    hunterDmg: 1, hunterAspd: 1.2, nibbleMul: 0.8, speedMul: 0.88,
+    recallRush: 1, shieldSlow: 0, lead: 'drum', sfxSend: 'drumriff',
+  },
+  {
+    id: 'vivi', name: 'VIVI THE FIDDLER', instrument: 'violin', emoji: '🎻',
+    desc: 'Her music slows bad robots at the wall and calls everyone home FAST.',
+    sendCount: 1, sendCd: 0, sendStream: 0.2, recallStream: 0.06,
+    hunterDmg: 0.85, hunterAspd: 1, nibbleMul: 1, speedMul: 1,
+    recallRush: 2.5, shieldSlow: 1.2, lead: 'sawtooth', sfxSend: 'stringriff',
+  },
+];

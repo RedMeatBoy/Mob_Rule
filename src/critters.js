@@ -74,9 +74,18 @@ export class MobSystem {
   }
   dmgOf(c) {
     let d = statFor(c.sp, c.tier, 'dmg') * (1 + this.buffs.dmg);
+    if (c.duty === 'attack' && c.mods) d *= (c.mods.hunterDmg || 1);
     if (c.crowned) d *= 1.5;
     if (Math.random() < this.buffs.crit) d *= 2;
     return d;
+  }
+
+  // Attack cadence, shaped by the owner's character: BAM's hunters drum
+  // faster, his shield naps; VIVI plays it straight.
+  atkCad(c, def) {
+    let m = 1 + this.buffs.atkspd;
+    if (c.mods) m *= c.duty === 'attack' ? (c.mods.hunterAspd || 1) : (c.mods.nibbleMul || 1);
+    return def.atkTime / m;
   }
 
   // Three of a kind become one bigger kind. Cascades. Fanfare mandatory.
@@ -164,16 +173,18 @@ export class MobSystem {
     }
     if (c.atkT > 0) return;
     if (def.role === 'ranged' || def.role === 'homing') {
-      c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+      c.atkT = this.atkCad(c, def);
       c.squash = 0.5;
       game.spawnProj(c.x, c.y - 6, t, this.dmgOf(c), def.role === 'homing', SPECIES[c.sp].accent);
       if (Math.random() < 0.4) game.audio.sfx(def.sound);
     } else {
       const reach = t.size + size * 0.8 + 10;
       if (Math.hypot(t.x - c.x, t.y - c.y) < reach) {
-        c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+        c.atkT = this.atkCad(c, def);
         c.squash = 0.6;
         game.enemies.hurt(game, t, this.dmgOf(c), c, {});
+        // VIVI's lullaby wall: robots that touch the shield get entranced.
+        if (c.duty === 'shield' && c.mods && c.mods.shieldSlow) t.slowT = Math.max(t.slowT || 0, c.mods.shieldSlow);
         if (Math.random() < 0.25) game.audio.sfx(def.sound);
       }
     }
@@ -195,7 +206,7 @@ export class MobSystem {
       }
     }
     if (healed) {
-      c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+      c.atkT = this.atkCad(c, def);
       c.squash = 0.4;
       game.audio.sfx('chime');
     }
@@ -213,8 +224,9 @@ export class MobSystem {
     }
     best.duty = 'attack';
     best.target = null;
+    best.mods = piper.char || null;
     game.fx.ring(best.x, best.y, 20, '#ff9a6a', 0.3);
-    game.audio.sfx('whistle');
+    game.audio.sfx((piper.char && piper.char.sfxSend) || 'whistle');
     game.audio.sfx(SPECIES[best.sp].sound);
     return best;
   }
@@ -283,6 +295,7 @@ export class MobSystem {
       if (!piper) continue;
       const def = SPECIES[c.sp];
       const spd = statFor(c.sp, c.tier, 'speed') * (1 + this.buffs.speed);
+      c.mods = piper.char || c.mods || null;
 
       if (c.duty === 'shield') {
         // Hold the wall: orbit the piper, bite what breaches it.
@@ -293,7 +306,7 @@ export class MobSystem {
         const dx = tx - c.x, dy = ty - c.y;
         const d = Math.hypot(dx, dy);
         if (d > 8) {
-          const rush = d > 120 ? 1.9 : 1.25;
+          const rush = d > 120 ? 1.9 * ((c.mods && c.mods.recallRush) || 1) : 1.25;
           c.vx = (dx / d) * spd * rush;
           c.vy = (dy / d) * spd * rush;
         } else { c.vx *= 0.7; c.vy *= 0.7; }
@@ -400,7 +413,7 @@ export class MobSystem {
         c.vx *= 0.8; c.vy *= 0.8;
         c.face = t.x > c.x ? 1 : -1;
         if (c.atkT <= 0) {
-          c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+          c.atkT = this.atkCad(c, def);
           c.squash = 0.5;
           game.spawnProj(c.x, c.y - 6, t, this.dmgOf(c), def.role === 'homing', SPECIES[c.sp].accent);
           game.audio.sfx(def.sound);
@@ -409,7 +422,7 @@ export class MobSystem {
       }
       case 'charge': {
         if (c.cdT <= 0 && d < 180 && d > 30) {
-          c.cdT = def.atkTime / (1 + this.buffs.atkspd);
+          c.cdT = this.atkCad(c, def);
           const a = Math.atan2(t.y - c.y, t.x - c.x);
           c.vx = Math.cos(a) * spd * 3.2;
           c.vy = Math.sin(a) * spd * 3.2;
@@ -440,7 +453,7 @@ export class MobSystem {
         if (d > reach + 10) { this.seek(c, t.x, t.y, spd); return true; }
         c.vx *= 0.7; c.vy *= 0.7;
         if (c.atkT <= 0) {
-          c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+          c.atkT = this.atkCad(c, def);
           c.squash = 0.8;
           const r = def.radius * (1 + (c.tier - 1) * 0.3);
           game.fx.ring(c.x, c.y, r, '#c9a05a', 0.35);
@@ -452,7 +465,7 @@ export class MobSystem {
       }
       case 'pierce': {
         if (c.cdT <= 0 && d < 220) {
-          c.cdT = def.atkTime / (1 + this.buffs.atkspd);
+          c.cdT = this.atkCad(c, def);
           const a = Math.atan2(t.y - c.y, t.x - c.x);
           c.vx = Math.cos(a) * spd * 3.8;
           c.vy = Math.sin(a) * spd * 3.8;
@@ -475,7 +488,7 @@ export class MobSystem {
         c.vx *= 0.6; c.vy *= 0.6;
         c.face = t.x > c.x ? 1 : -1;
         if (c.atkT <= 0) {
-          c.atkT = def.atkTime / (1 + this.buffs.atkspd);
+          c.atkT = this.atkCad(c, def);
           c.squash = 0.6;
           game.enemies.hurt(game, t, this.dmgOf(c), c, {});
           if (Math.random() < 0.25) game.audio.sfx(def.sound);

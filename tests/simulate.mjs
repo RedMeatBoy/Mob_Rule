@@ -34,6 +34,8 @@ globalThis.localStorage = {
 const { Game } = await load('src/game.js');
 
 const RUNS = parseInt(process.argv[2], 10) || 20;
+const CHAR = { pip: 0, bam: 1, vivi: 2 }[process.argv[3]] ?? 0;
+if (process.argv[3]) console.log(`character: ${process.argv[3]} (#${CHAR})`);
 const waveReached = [];
 let wins = 0, totalMobPeak = 0;
 const t0 = Date.now();
@@ -41,6 +43,7 @@ const t0 = Date.now();
 for (let r = 0; r < RUNS; r++) {
   const g = new Game(null);
   g.save.acorns = r % 2 === 0 ? 0 : 5000; // half the runs with unlocks
+  g.save.chars = [CHAR, CHAR];
   g.input.assign(0, 'kb1');
   g.startRun();
   const p = g.players[0];

@@ -123,6 +123,7 @@ export class AudioSystem {
     this.ctx = null; this.master = null; this.musicGain = null;
     this.muted = false; this.last = new Map();
     this.voice = null; // speech-synthesis announcer (picked lazily)
+    this.lead = null;  // character instrument: null(flute)|'drum'|'sawtooth'
     this.playing = false; this.beat = 0; this.nextT = 0; this.interval = null;
     this.intensity = 0; // 0..1, layers in the second melody voice
   }
@@ -235,11 +236,12 @@ export class AudioSystem {
       // Melody (octave doubler layers in when the horde is big).
       const m = song.mel[step];
       if (m != null) {
-        this.tone(nf(m), t, song.stepDur * 1.1, song.melType, song.melVol, this.musicGain, 0, 11);
+        this.tone(nf(m), t, song.stepDur * 1.1, this.lead === 'sawtooth' ? 'sawtooth' : song.melType, song.melVol, this.musicGain, 0, 11);
         if (this.intensity > 0.5) this.tone(nf(m + 12), t, song.stepDur * 0.8, 'sine', 0.035, this.musicGain);
       }
       // Drums.
       if (song.kick[s]) this.tone(58, t, 0.12, 'sine', 0.3, this.musicGain, 40);
+      if (this.lead === 'drum' && s % 2 === 1) this.tone(70, t, 0.07, 'sine', 0.14, this.musicGain, 48); // BAM's extra beat
       if (song.snare[s]) this.nz(t, 0.09, 0.09, 1400);
       if (song.hat[s]) this.nz(t, 0.03, 0.05, 7000);
 
@@ -265,6 +267,8 @@ export class AudioSystem {
     const t = this.ctx.currentTime;
     switch (name) {
       // Species voices (tiny, characterful)
+      case 'drumriff': this.tone(85, t, 0.07, 'square', 0.14, null, 55); this.tone(85, t + 0.09, 0.07, 'square', 0.14, null, 55); this.tone(62, t + 0.18, 0.12, 'square', 0.18, null, 40); break;
+      case 'stringriff': this.tone(392, t, 0.16, 'sawtooth', 0.09, null, 587, 14); this.tone(587, t + 0.14, 0.2, 'sawtooth', 0.08, null, 784, 14); break;
       case 'ribbit': this.tone(160, t, 0.09, 'square', 0.10, null, 90); this.tone(140, t + 0.08, 0.07, 'square', 0.08, null, 180); break;
       case 'quack': this.tone(300, t, 0.1, 'sawtooth', 0.10, null, 210); break;
       case 'bleat': this.tone(420, t, 0.16, 'sawtooth', 0.09, null, 380, 22); break;

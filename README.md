@@ -16,6 +16,20 @@ believe animals are clutter. Prove them extremely wrong.
 
 1–2 players (local co-op) · keyboard or Xbox controllers · Chrome/Edge best.
 
+## 🎭 Pick your bandleader
+
+Three musicians, same two buttons, totally different feel:
+
+- **🎵 PIP THE PIPER** — steady and true. One out, one home.
+- **🥁 BAM THE DRUMMER** — DRUMROLL! Sends **three** hunters at once and they
+  fight faster… but he walks slow and his shield gets sloppy.
+- **🎻 VIVI THE FIDDLER** — pink dress, big bows, bigger brain: her music
+  **slows robots** that touch the shield and recalls come home lightning-fast.
+  Her hunters hit a little softer.
+
+Plus **3 save files** — everyone in the family gets their own progress.
+(Deleting asks twice, out loud, so nobody loses a save by accident.)
+
 ## 🎮 How to play (there are only two buttons)
 
 | Action | Keyboard P1 | Keyboard P2 | Xbox |
@@ -71,7 +85,7 @@ rebuild the parade.
 ```bash
 git clone https://github.com/RedMeatBoy/Mob_Rule.git
 cd Mob_Rule && npx serve     # or python -m http.server
-node tests/engine.mjs        # 73 headless assertions
+node tests/engine.mjs        # 89 headless assertions
 node tests/simulate.mjs 24   # bot plays full runs; reports difficulty band
 node tests/perf.mjs          # 150-critter mob tick time
 ```
