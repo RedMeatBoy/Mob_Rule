@@ -1,0 +1,68 @@
+# MOB RULE — swarm-leader survivor
+
+Designed explicitly around proven strengths (see Brad's verdicts on prior
+games): constant feedback, auto-combat, entity-count spectacle, zero precision
+input, headlessly simulatable balance. No platforming, no feel-critical physics.
+
+**Core fantasy:** the mob IS the health bar, weapon, and progression. Player
+verbs: walk (mob follows your recorded path) + whistle (send) + recall.
+
+## Status: complete & tuned
+
+- 12 species × 3 tiers (auto-merge 3→1 with fanfare), 6 bot types + 3 bosses,
+  12 waves, 24 crossroads cards, 7 meta unlocks (lifetime acorns), co-op with
+  proximity revive, Little Piper mode, march music (lookahead scheduler).
+- Verified: 31/31 headless assertions (stable across repeated runs);
+  balance sim IN BAND (mediocre bot: median wave 7 of 12, never wins);
+  perf 0.27ms avg tick with 154 critters + bots + projectiles.
+
+## Architecture
+
+```
+src/
+  data.js      ALL content: species, enemies, waves, choices, flavor
+  critters.js  MobSystem: trail-following AI (each critter follows the piper's
+               recorded path at its own lag+lateral offset — the conga-swarm),
+               9 role behaviors, auto-merge (worth grows even as count shrinks),
+               wild-card effects, cached procedural sprites
+  piper.js     player: movement, trail ring-buffer, whistle rally, hearts
+  enemies.js   Tidy Empire bots + MOWTRON/SUCC-5000/SUPERVISOR
+  game.js      state machine, fixed 60Hz, waves, cages, acorns, crossroads,
+               camera (co-op zoom), meta save (localStorage 'mob_rule_v1')
+  ui.js        title, HUD (the BIG mob counter), crossroads cards, end screens
+  input.js, audio.js, fx.js, pool.js
+```
+
+### Key invariants & gotchas
+- **Merges can shrink `mob.list` mid-iteration** (boss drops, bunny breeding,
+  pack applies). `remove()` marks `_gone`; every list iteration guards
+  `!c || c._gone`. Tests measure mob WORTH (Σ 3^(tier-1)), never raw count.
+- Mob cap 150; over-cap recruits convert to acorns with a joke.
+- Trail: piper stores a point every 7px moved (ring buffer 420); critter i
+  follows point at `lag` with perpendicular `side` offset.
+- Whistle rally: hold-to-maintain, 0.35s linger, snaps to nearest bot within
+  200px of the aim point (aim assist for kids).
+- Bag-bots physically remove critters (`bagged`) — killing the bot frees them;
+  reaching the arena edge deletes them permanently.
+
+## Balance knobs (in tuning order)
+- `data.js` SPECIES hp/dmg (already +60% hp pass applied), `enemyScale()`
+  growth (0.18 hp / 0.06 dmg per wave), WAVES rate arrays, pack counts.
+- Between-wave full mob heal happens in `game.endWave` (kindness mechanic).
+- Run `node tests/simulate.mjs 24` after ANY change: target median wave 6–11
+  for the mediocre bot. Currently 7.
+
+## Verification
+```
+node tests/engine.mjs      # 31 assertions: follow/merge/combat/whistle/
+                           # crossroads/bosses/co-op/wilds
+node tests/simulate.mjs 24 # difficulty band check
+node tests/perf.mjs        # max-load tick time
+```
+
+## Adding content
+- Species: add to SPECIES in data.js (role picks the behavior; add a pack
+  card + unlock threshold). New roles need a case in critters.behaveCombat.
+- Enemy: ENEMIES entry + behavior case in enemies.behave + drawBot case.
+- Crossroads card: CHOICES entry; wild effects need a hook in critters/game.
+- Waves: WAVES table (12 entries; boss field spawns at 12% progress).
