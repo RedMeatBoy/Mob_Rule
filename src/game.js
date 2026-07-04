@@ -121,7 +121,7 @@ export class Game {
     this.audio.sfx('wavestart');
     this.audio.intensity = n / 12;
     this.ui.banner(def.boss ? `WAVE ${n} — ${this.bossName(def.boss)}` : `WAVE ${n}`, def.boss ? '#e05c5c' : '#fff');
-    this.audio.say(def.boss ? `Wave ${n}! Here comes the big boss! You can do it!` : `Wave ${n}! Here they come!`, true);
+    this.audio.say(def.boss ? `Wave ${n}! Here comes ${this.bossName(def.boss)}! You can do it!` : `Wave ${n}! Here they come!`, true);
     // Scatter recruitment cages.
     for (let i = 0; i < def.cages; i++) {
       this.cages.push({
@@ -132,7 +132,7 @@ export class Game {
       });
     }
   }
-  bossName(id) { return { mowtron: 'MOWTRON 9000', succ: 'THE SUCC-5000', supervisor: 'THE SUPERVISOR' }[id]; }
+  bossName(id) { return { mowtron: 'MOWTRON 9000', succ: 'THE SUCC-5000', supervisor: 'BUNNYTRON' }[id]; }
 
   waveDone() {
     if (this.waveT > 0) return false;
@@ -312,6 +312,18 @@ export class Game {
   acorns(n, x, y) {
     this.runStats.acorns += n;
     if (x != null) this.fx.num(x, y, `+${n} 🌰`, '#c9a05a', 11);
+    // Acorn-fed growth: every 50 acorns this run, the whole mob gets 15%
+    // physically bigger (capped at ×2 so the orbit still fits on screen).
+    const tier = Math.min(5, Math.floor(this.runStats.acorns / 50));
+    if (tier > this.mob.growth) {
+      this.mob.growth = tier;
+      this.mob.sizeMul = Math.pow(1.15, tier);
+      this.ui.banner('THE MOB GROWS BIGGER!', '#ffd166');
+      this.audio.sfx('recruit');
+      this.audio.say('Wow! All those acorns made your critters grow bigger!');
+      const p = this.players[0];
+      if (p) this.fx.confetti(p.x, p.y - 30, 18);
+    }
   }
 
   // ---------- frame ----------

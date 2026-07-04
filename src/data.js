@@ -128,14 +128,14 @@ export const ENEMIES = {
     body: '#6a5a8a', accent: '#c8ccd8', behavior: 'boss_succ',
     pullRadius: 340, pullForce: 130,
   },
-  supervisor: {
-    name: 'THE SUPERVISOR', hp: 950, dmg: 6, speed: 45, size: 38, xp: 120, boss: true,
-    body: '#3a4a5a', accent: '#e8c33a', behavior: 'boss_supervisor',
+  supervisor: { // final boss: BUNNYTRON, the giant pink robot bunny
+    name: 'BUNNYTRON', hp: 950, dmg: 6, speed: 45, size: 38, xp: 120, boss: true,
+    body: '#ff8fb3', accent: '#ffd7e6', behavior: 'boss_supervisor',
   },
 };
 
 export function enemyScale(wave) {
-  return { hp: 1 + 0.18 * (wave - 1), dmg: 1 + 0.06 * (wave - 1) };
+  return { hp: 1 + 0.21 * (wave - 1), dmg: 1 + 0.065 * (wave - 1) };
 }
 
 // ---------- WAVES ----------
@@ -203,7 +203,7 @@ export const DEFEAT_LINES = [
   'The bots tidied everything. It’s horrible. So clean.',
 ];
 export const VICTORY_LINES = [
-  'THE SUPERVISOR has been unplugged. The meadow is gloriously messy forever.',
+  'BUNNYTRON has been unplugged. The meadow is gloriously messy forever.',
   'Nature wins. The paperwork is returned to sender, via goat.',
   'The mob celebrates by ignoring you and eating everything.',
 ];

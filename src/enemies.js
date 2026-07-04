@@ -1,5 +1,5 @@
 // enemies.js — the Tidy Empire: bots that think animals are clutter.
-// Plus three bosses: MOWTRON 9000, THE SUCC-5000, and THE SUPERVISOR.
+// Plus three bosses: MOWTRON 9000, THE SUCC-5000, and BUNNYTRON.
 
 import { Pool, Grid, clamp, lerp, dist2, randRange, makeSprite } from './pool.js';
 import { ENEMIES, enemyScale, TIDY_LINES } from './data.js';
@@ -17,10 +17,11 @@ export class EnemySystem {
     this.grid = new Grid(arenaW, arenaH, 90);
     this.sprites = {};
     this.telegraphs = []; // spawn-in markers
+    this.bombs = [];      // BUNNYTRON's carrot bombs (telegraphed AOE)
     this.time = 0;
   }
 
-  clear() { this.pool.clear(); this.telegraphs.length = 0; }
+  clear() { this.pool.clear(); this.telegraphs.length = 0; this.bombs.length = 0; }
   count() { return this.pool.n; }
   // Cones are placed obstacles the mob deliberately ignores — they must
   // never hold a wave open.
@@ -50,6 +51,7 @@ export class EnemySystem {
     e.hitT = 0; e.slowT = 0; e.kx = 0; e.ky = 0; e.touchCd = 0;
     e.dead = false; e.bagged = null; e.boss = !!def.boss; e.phase2 = false;
     e.face = 1; e.barkT = randRange(4, 12);
+    e.bombT = 3;
     e.life = kind === 'cone' ? 14 : Infinity;
     e.sneaky = !def.boss && kind !== 'cone' && Math.random() < 0.3;
     // Personal approach bearing: the pack fans out and boxes you in
@@ -136,6 +138,24 @@ export class EnemySystem {
       }
     }
     // Grid rebuild.
+    // Carrot bombs land.
+    for (let i = this.bombs.length - 1; i >= 0; i--) {
+      const b = this.bombs[i];
+      b.t -= dt;
+      if (b.t > 0) continue;
+      this.bombs.splice(i, 1);
+      game.audio.sfx('stomp');
+      game.shake(0.3);
+      game.fx.ring(b.x, b.y, 92, '#ff9a3c', 0.45);
+      game.fx.sparks(b.x, b.y, 12);
+      game.mob.grid.query(b.x, b.y, 92, c => {
+        if (!c.bagged && dist2(b.x, b.y, c.x, c.y) < 92 * 92) game.mob.hurt(game, c, b.dmg, null);
+      });
+      for (const p of game.players) {
+        if (!p.dead && !p.downed && dist2(b.x, b.y, p.x, p.y) < 92 * 92) p.hurt(game, 22, null);
+      }
+    }
+
     this.grid.clear();
     const P = this.pool;
     for (let i = 0; i < P.n; i++) { const e = P.get(i); if (!e.dead) this.grid.insert(e.x, e.y, e); }
@@ -431,7 +451,25 @@ export class EnemySystem {
     if (!e.phase2 && e.hp < e.maxHp * 0.5) {
       e.phase2 = true; e.speed *= 1.25;
       game.audio.sfx('boss');
-      game.fx.num(e.x, e.y - 50, 'PERFORMANCE REVIEW TIME', '#e8c33a', 14);
+      game.fx.num(e.x, e.y - 50, 'MEGA HOP MODE!', '#ff8fb3', 14);
+    }
+    // Carrot bombs: lobbed at the mob on a steady clock, any state.
+    e.bombT -= dt;
+    if (e.bombT <= 0) {
+      e.bombT = e.phase2 ? 3.6 : 5.2;
+      const list = game.mob.list.filter(c => c && !c._gone && !c.bagged);
+      const n = e.phase2 ? 3 : 2;
+      for (let k = 0; k < n; k++) {
+        const tgt = list.length && Math.random() < 0.8
+          ? list[Math.floor(Math.random() * list.length)]
+          : game.players.find(p => !p.dead && !p.downed);
+        if (!tgt) continue;
+        this.bombs.push({
+          x: tgt.x + randRange(-50, 50), y: tgt.y + randRange(-50, 50),
+          t: 1.25, dur: 1.25, dmg: e.dmg,
+        });
+      }
+      game.audio.sfx('telegraph');
     }
     const cd = e.phase2 ? 0.7 : 1;
     if (e.state === 'move') {
@@ -501,6 +539,28 @@ export class EnemySystem {
   }
 
   render(ctx, alpha, game) {
+    // Carrot bombs: landing-zone ring + carrot falling from the sky.
+    for (const b of this.bombs) {
+      const k = 1 - b.t / b.dur; // 0 = just launched, 1 = impact
+      ctx.globalAlpha = 0.3 + k * 0.4;
+      ctx.strokeStyle = '#ff9a3c';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 92 * (0.35 + 0.65 * k), 0, 6.29); ctx.stroke();
+      ctx.globalAlpha = 1;
+      // The carrot itself, dropping in with a spin.
+      const cy = b.y - (1 - k) * 340;
+      ctx.save();
+      ctx.translate(b.x, cy);
+      ctx.rotate(k * 5);
+      ctx.fillStyle = '#ff8a3c';
+      ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(-8, -8); ctx.lineTo(8, -8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#c96a2e'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#7ec850';
+      ctx.beginPath(); ctx.ellipse(-4, -12, 4, 6, -0.5, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(4, -12, 4, 6, 0.5, 0, 6.29); ctx.fill();
+      ctx.restore();
+    }
+
     const P = this.pool;
     for (let i = 0; i < P.n; i++) {
       const e = P.get(i);
@@ -673,18 +733,37 @@ function drawBot(ctx, def, size, elite) {
       ctx.fillStyle = '#e05c5c';
       ctx.fillRect(-2 * s, -6 * s, 3 * s, 3 * s); ctx.fillRect(4 * s, -6 * s, 3 * s, 3 * s);
       break;
-    case 'boss_supervisor':
+    case 'boss_supervisor': // BUNNYTRON: giant pink robot bunny
+      // Robot ears with glowing tips.
       ctx.fillStyle = body;
-      ctx.fillRect(-12 * s, -14 * s, 24 * s, 26 * s);
-      ctx.strokeRect(-12 * s, -14 * s, 24 * s, 26 * s);
-      ctx.fillStyle = def.accent; // tie
-      ctx.beginPath(); ctx.moveTo(0, -8 * s); ctx.lineTo(-2.4 * s, 0); ctx.lineTo(0, 8 * s); ctx.lineTo(2.4 * s, 0); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#c8ccd8'; // clipboard arm
-      ctx.fillRect(12 * s, -6 * s, 7 * s, 9 * s);
+      ctx.beginPath(); ctx.ellipse(-6 * s, -20 * s, 3.4 * s, 10 * s, -0.15, 0, 6.29); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(6 * s, -20 * s, 3.4 * s, 10 * s, 0.15, 0, 6.29); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = def.accent; // inner ear panels
+      ctx.beginPath(); ctx.ellipse(-6 * s, -20 * s, 1.6 * s, 6.5 * s, -0.15, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(6 * s, -20 * s, 1.6 * s, 6.5 * s, 0.15, 0, 6.29); ctx.fill();
+      ctx.fillStyle = '#ff4a7a'; // ear-tip lights
+      ctx.beginPath(); ctx.arc(-6.8 * s, -28 * s, 1.6 * s, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(6.8 * s, -28 * s, 1.6 * s, 0, 6.29); ctx.fill();
+      // Boxy robot body with belly plate + rivets.
+      ctx.fillStyle = body;
+      ctx.fillRect(-12 * s, -12 * s, 24 * s, 24 * s);
+      ctx.strokeRect(-12 * s, -12 * s, 24 * s, 24 * s);
+      ctx.fillStyle = def.accent;
+      ctx.beginPath(); ctx.ellipse(0, 5 * s, 7 * s, 5.5 * s, 0, 0, 6.29); ctx.fill();
+      ctx.fillStyle = '#e86a96';
+      ctx.fillRect(-11 * s, -11 * s, 2 * s, 2 * s); ctx.fillRect(9 * s, -11 * s, 2 * s, 2 * s);
+      // Visor eyes + buck teeth.
+      ctx.fillStyle = '#3a2a3a';
+      ctx.fillRect(-8 * s, -8 * s, 16 * s, 4 * s);
+      ctx.fillStyle = '#ff4a7a';
+      ctx.fillRect(-6 * s, -7 * s, 3 * s, 2 * s); ctx.fillRect(3 * s, -7 * s, 3 * s, 2 * s);
       ctx.fillStyle = '#fff';
-      ctx.fillRect(13 * s, -5 * s, 5 * s, 7 * s);
-      ctx.fillStyle = '#e05c5c';
-      ctx.fillRect(-7 * s, -11 * s, 4 * s, 3 * s); ctx.fillRect(3 * s, -11 * s, 4 * s, 3 * s);
+      ctx.fillRect(-2.4 * s, -2.5 * s, 2.2 * s, 3.4 * s); ctx.fillRect(0.2 * s, -2.5 * s, 2.2 * s, 3.4 * s);
+      // Carrot launcher arm.
+      ctx.fillStyle = '#c8ccd8';
+      ctx.fillRect(12 * s, -6 * s, 8 * s, 6 * s);
+      ctx.fillStyle = '#ff8a3c';
+      ctx.beginPath(); ctx.moveTo(20 * s, -6.5 * s); ctx.lineTo(24 * s, -3 * s); ctx.lineTo(20 * s, 0.5 * s); ctx.closePath(); ctx.fill();
       break;
   }
 }

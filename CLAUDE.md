@@ -18,6 +18,15 @@ crack a cage, arrow points the way) else the run ends with cause 'mobwipe'
 piper HP matters before the mob dies; boss stomp/broom sweep deal 0.6-0.65x
 to critters so one AOE can't erase the packed orbit.
 
+Round-6 (Brad feedback): final boss reskinned to BUNNYTRON, giant pink robot
+bunny (same id 'supervisor', same stomp/projectile/summon moveset) + carrot
+bombs: telegraphed AOE (enemies.bombs, 1.25s fall, r92, aimed at random
+critters; 2/volley, 3 + faster in phase2). Acorn-fed growth: every 50
+run-acorns mob sizeMul ×1.15 (cap ×2 at tier 5) — scales sprite, reach,
+nibble size, orbit radius (×0.7 blend). enemyScale nudged 0.18→0.21 hp /
+0.06→0.065 dmg to offset the reach buff (sim was median 11 + a bot win;
+back to median 10, 0 wins).
+
 Round-5 (Brad feedback, post-victory): fx.notice() = 2.6s readable popups
 (cage frees, crossroads cards, acorn hint) vs 0.55s fx.num; audio.say() =
 Web Speech announcer (bright/positive, priority lines interrupt, chatter
@@ -52,7 +61,7 @@ src/
                9 role behaviors, auto-merge (worth grows even as count shrinks),
                wild-card effects, cached procedural sprites
   piper.js     player: movement, trail ring-buffer, whistle rally, hearts
-  enemies.js   Tidy Empire bots + MOWTRON/SUCC-5000/SUPERVISOR
+  enemies.js   Tidy Empire bots + MOWTRON/SUCC-5000/BUNNYTRON
   game.js      state machine, fixed 60Hz, waves, cages, acorns, crossroads,
                camera (co-op zoom), meta save (localStorage 'mob_rule_v1')
   ui.js        title, HUD (the BIG mob counter), crossroads cards, end screens

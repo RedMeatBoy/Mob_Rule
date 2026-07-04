@@ -52,9 +52,12 @@ rebuild the parade.
 - **12 species**, each with a job: frogs bite, ducks spit, goats headbutt,
   turtles taunt, skunks… you know. Owls snipe. The moose is a moose.
 - **12 waves, 3 bosses:** MOWTRON 9000 (charges), THE SUCC-5000 (pulls your
-  whole mob toward its nozzle — waddle away!), and THE SUPERVISOR (clipboard,
-  stomps, performance reviews).
+  whole mob toward its nozzle — waddle away!), and **BUNNYTRON** — a giant
+  pink robot bunny that stomps, summons, and rains **carrot bombs** on your
+  mob (watch for the orange landing rings!).
 - **Bag-Bots steal critters.** Pop the bot, free the friend.
+- **Acorns feed the mob:** every 50 acorns you grab in a run, your whole mob
+  physically **grows 15% bigger** (and reaches farther). Chunky parade!
 - **Acorns** drop from scrapped bots — they unlock **7 more species**
   permanently (bunny → skunk → owl → wizard mouse → penguin → butterfly →
   moose) and track your legend: *biggest mob ever* is saved forever.
@@ -68,7 +71,7 @@ rebuild the parade.
 ```bash
 git clone https://github.com/RedMeatBoy/Mob_Rule.git
 cd Mob_Rule && npx serve     # or python -m http.server
-node tests/engine.mjs        # 65 headless assertions
+node tests/engine.mjs        # 73 headless assertions
 node tests/simulate.mjs 24   # bot plays full runs; reports difficulty band
 node tests/perf.mjs          # 150-critter mob tick time
 ```

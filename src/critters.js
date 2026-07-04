@@ -27,6 +27,8 @@ export class MobSystem {
     this.wild = { bunnyBreed: false, crown: false, beeFuneral: false };
     this.time = 0;
     this.biggest = 0;
+    this.sizeMul = 1;  // acorn-fed growth: ×1.15 per 50 acorns this run
+    this.growth = 0;
   }
 
   count() { return this.list.length; }
@@ -142,7 +144,8 @@ export class MobSystem {
     const j = i - base;
     const dir = ring % 2 ? -1 : 1;
     const ang = (j / inRing) * 6.2832 + t * (0.75 - ring * 0.12) * dir + ring * 0.55;
-    return { r: 46 + ring * 30, ang };
+    // Bigger critters need a roomier orbit.
+    return { r: (46 + ring * 30) * (1 + (this.sizeMul - 1) * 0.7), ang };
   }
 
   // Shield critters fight without leaving their post.
@@ -295,7 +298,7 @@ export class MobSystem {
           c.vy = (dy / d) * spd * rush;
         } else { c.vx *= 0.7; c.vy *= 0.7; }
         if (def.role === 'heal') this.healInPlace(c, def, game);
-        else this.attackInPlace(c, def, game, statFor(c.sp, c.tier, 'size'));
+        else this.attackInPlace(c, def, game, statFor(c.sp, c.tier, 'size') * this.sizeMul);
         // The shield is where you heal: 4% max HP per second on wall duty.
         const cmax = this.maxHp(c.sp, c.tier);
         if (c.hp < cmax) {
@@ -387,7 +390,7 @@ export class MobSystem {
   behaveCombat(c, dt, game, def, spd) {
     const t = c.target;
     const d = Math.hypot(t.x - c.x, t.y - c.y);
-    const reach = t.size + statFor(c.sp, c.tier, 'size') * 0.7 + 4;
+    const reach = t.size + statFor(c.sp, c.tier, 'size') * this.sizeMul * 0.7 + 4;
 
     switch (def.role) {
       case 'ranged':
@@ -548,7 +551,7 @@ export class MobSystem {
       const x = lerp(c.px, c.x, alpha);
       const y = lerp(c.py, c.y, alpha);
       const def = SPECIES[c.sp];
-      const size = statFor(c.sp, c.tier, 'size');
+      const size = statFor(c.sp, c.tier, 'size') * this.sizeMul;
       const spr = this.sprite(c.sp, c.tier);
       const hop = def.flies
         ? Math.sin(c.wob) * 3
@@ -563,7 +566,7 @@ export class MobSystem {
 
       ctx.save();
       ctx.translate(x, y + hop);
-      ctx.scale(c.face * sq, 2 - sq);
+      ctx.scale(c.face * sq * this.sizeMul, (2 - sq) * this.sizeMul);
       ctx.drawImage(spr, -spr.width / 2, -spr.height / 2);
       ctx.restore();
 

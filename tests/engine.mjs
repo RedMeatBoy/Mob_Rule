@@ -468,5 +468,42 @@ console.log('L) Round 5: readable notices, voice announcer, acorn clarity:');
   check(typeof g.mob.chatterT === 'number', 'mob chatter timer runs');
 }
 
+console.log('M) Round 6: BUNNYTRON + acorn-fed growth:');
+{
+  const { ENEMIES } = await load('src/data.js');
+  check(ENEMIES.supervisor.name === 'BUNNYTRON' && ENEMIES.supervisor.body === '#ff8fb3', 'final boss is a pink robot bunny');
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  p.invuln = 9999;
+  const boss = g.enemies.spawnNow(g, 'supervisor', p.x + 300, p.y);
+  boss.hp = 1e9;
+  let sawBomb = false;
+  for (let i = 0; i < 60 * 10; i++) {
+    g.frame(1 / 60);
+    if (g.enemies.bombs.length > 0) sawBomb = true;
+  }
+  check(sawBomb, 'BUNNYTRON lobs carrot bombs');
+  check(g.mob.mobHealth().frac < 1 || g.mob.count() < 5, 'carrot bombs hurt the mob', `frac=${g.mob.mobHealth().frac.toFixed(2)}`);
+}
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  check(g.mob.sizeMul === 1, 'mob starts at normal size');
+  g.acorns(50);
+  check(g.mob.growth === 1 && Math.abs(g.mob.sizeMul - 1.15) < 0.001, '50 acorns -> +15% size', `mul=${g.mob.sizeMul}`);
+  g.acorns(150); // total 200 -> tier 4
+  check(g.mob.growth === 4, 'growth tiers stack every 50 acorns', `growth=${g.mob.growth}`);
+  g.acorns(5000);
+  check(g.mob.growth === 5 && g.mob.sizeMul <= 2.02, 'growth caps at x2', `mul=${g.mob.sizeMul.toFixed(2)}`);
+  // Bigger critters get a roomier orbit.
+  const small = new Game(null); small.input.assign(0, 'kb1'); small.startRun();
+  const rBig = g.mob.orbitSlot(0, 10, 0).r;
+  const rSmall = small.mob.orbitSlot(0, 10, 0).r;
+  check(rBig > rSmall, 'orbit widens as the mob grows', `${rSmall.toFixed(0)} -> ${rBig.toFixed(0)}`);
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);
