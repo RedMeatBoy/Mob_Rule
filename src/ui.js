@@ -41,6 +41,19 @@ export class UI {
   }
 
   banner(text, color) { this.bannerData = { text, color: color || '#fff', t: 2.4, max: 2.4 }; }
+
+  // Piper damage must be unmissable — the piper IS the loss condition.
+  piperHit(p) {
+    this.dmgFlash = 0.7;
+    this.dmgMsg = p.hearts <= 0 ? `P${p.slot + 1} IS DOWN!`
+      : p.hearts === 1 ? `P${p.slot + 1}: LAST HEART!!`
+      : `P${p.slot + 1} HIT — ${p.hearts}♥ LEFT`;
+    this.heartPop = 0.5;
+    if (!this.recallHintShown && this.g.mob.count() > 0) {
+      this.recallHintShown = true;
+      this.recallHintT = 5;
+    }
+  }
   openCrossroads() {
     this.pickSlot = 0;
     this.picksLeft = this.g.players.length;
@@ -56,6 +69,9 @@ export class UI {
   update(dt) {
     this.t += dt;
     this.mobPop = Math.max(0, this.mobPop - dt);
+    this.dmgFlash = Math.max(0, (this.dmgFlash || 0) - dt);
+    this.heartPop = Math.max(0, (this.heartPop || 0) - dt);
+    this.recallHintT = Math.max(0, (this.recallHintT || 0) - dt);
     if (this.bannerData) { this.bannerData.t -= dt; if (this.bannerData.t <= 0) this.bannerData = null; }
     const g = this.g, inp = g.input;
 
@@ -301,19 +317,61 @@ export class UI {
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     ctx.fillText(`wave ${g.waveNum}/12 · ${Math.ceil(g.waveT)}s`, VIEW_W / 2, 68);
 
-    // Piper hearts.
+    // Piper hearts — big, labeled, and they POP when you get hit.
     g.players.forEach((p, i) => {
-      const x = i === 0 ? 18 : VIEW_W - 18 - p.maxHearts * 22;
-      for (let h = 0; h < p.maxHearts; h++) {
-        ctx.font = '20px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = h < p.hearts ? p.color : 'rgba(0,0,0,0.3)';
-        ctx.fillText('♥', x + h * 22, 30);
-      }
-      ctx.font = `bold 12px ${FONT}`;
+      const pop = this.heartPop > 0 ? 1 + this.heartPop * 0.6 : 1;
+      const lastBeat = p.hearts === 1 && !p.downed ? 1 + Math.sin(this.t * 10) * 0.15 : 1;
+      const hsz = 24 * pop * lastBeat;
+      const x = i === 0 ? 18 : VIEW_W - 18 - p.maxHearts * (hsz + 2);
+      ctx.font = `bold 13px ${FONT}`;
+      ctx.textAlign = 'left';
       ctx.fillStyle = p.color;
-      ctx.fillText(`P${i + 1}${p.little ? ' ★' : ''}${p.downed ? ' — DOWN!' : ''}`, x, 48);
+      ctx.fillText(`P${i + 1} — YOUR PIPER${p.little ? ' ★' : ''}${p.downed ? '  (DOWN!)' : ''}`, x, 18);
+      for (let h = 0; h < p.maxHearts; h++) {
+        ctx.font = `${Math.round(hsz)}px sans-serif`;
+        ctx.fillStyle = h < p.hearts ? (p.hearts === 1 ? '#ff5c5c' : p.color) : 'rgba(0,0,0,0.32)';
+        ctx.fillText('♥', x + h * (hsz + 2), 42);
+      }
     });
+
+    // Damage flash: red vignette + center callout. Nobody misses this now.
+    if (this.dmgFlash > 0) {
+      const a = Math.min(0.5, this.dmgFlash);
+      const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.75);
+      grd.addColorStop(0, 'rgba(220,40,40,0)');
+      grd.addColorStop(1, `rgba(220,40,40,${a})`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.font = `bold 34px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(40,10,10,0.85)';
+      ctx.lineWidth = 6;
+      ctx.strokeText(this.dmgMsg, VIEW_W / 2, VIEW_H * 0.22);
+      ctx.fillStyle = '#ff8a8a';
+      ctx.fillText(this.dmgMsg, VIEW_W / 2, VIEW_H * 0.22);
+    }
+    // Persistent last-heart heartbeat vignette.
+    const dying = g.players.find(p => !p.dead && !p.downed && p.hearts === 1);
+    if (dying && this.dmgFlash <= 0) {
+      const pulse = (Math.sin(this.t * 6) + 1) / 2;
+      const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.78);
+      grd.addColorStop(0, 'rgba(220,40,40,0)');
+      grd.addColorStop(1, `rgba(220,40,40,${0.10 + pulse * 0.12})`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
+    // Contextual coaching: first time the piper gets hit, teach TO ME!.
+    if (this.recallHintT > 0) {
+      ctx.font = `bold 19px ${FONT}`;
+      ctx.textAlign = 'center';
+      const blink = 0.65 + Math.sin(this.t * 5) * 0.3;
+      ctx.fillStyle = `rgba(174,242,255,${blink})`;
+      ctx.strokeStyle = 'rgba(20,40,50,0.8)';
+      ctx.lineWidth = 5;
+      const msg = `press ${g.input.glyph(0, 'recall')} — TO ME! your mob rushes back to protect you`;
+      ctx.strokeText(msg, VIEW_W / 2, VIEW_H * 0.3);
+      ctx.fillText(msg, VIEW_W / 2, VIEW_H * 0.3);
+    }
 
     // Acorns.
     ctx.font = `bold 16px ${FONT}`;
@@ -362,12 +420,18 @@ export class UI {
       if (f > 0) { ctx.fillStyle = '#e05c5c'; rr(ctx, x, y, Math.max(10, w * f), 12, 6); ctx.fill(); }
     }
 
-    // Whistle hint (first wave only).
-    if (g.waveNum === 1 && g.runStats.time < 12) {
-      ctx.font = `bold 15px ${FONT}`;
+    // Staged wave-1 coaching: one idea at a time.
+    if (g.waveNum === 1 && g.runStats.time < 16) {
+      ctx.font = `bold 17px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(255,255,255,${0.6 + Math.sin(this.t * 4) * 0.3})`;
-      ctx.fillText(`move: stick/WASD · hold ${g.input.glyph(0, 'whistle')} to SEND the mob · ${g.input.glyph(0, 'recall')} recalls`, VIEW_W / 2, VIEW_H - 70);
+      ctx.fillStyle = `rgba(255,255,255,${0.65 + Math.sin(this.t * 4) * 0.3})`;
+      ctx.strokeStyle = 'rgba(30,45,20,0.7)';
+      ctx.lineWidth = 5;
+      const msg = g.runStats.time < 7
+        ? 'walk around — your mob follows YOUR path!'
+        : `hold ${g.input.glyph(0, 'whistle')} to SEND the mob at the robots!`;
+      ctx.strokeText(msg, VIEW_W / 2, VIEW_H - 70);
+      ctx.fillText(msg, VIEW_W / 2, VIEW_H - 70);
     }
 
     // Banner.
@@ -565,25 +629,33 @@ export class UI {
     ctx.font = `bold 52px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(20,30,12,0.85)'; ctx.lineWidth = 7;
-    const title = won ? '🌿 NATURE WINS 🌿' : 'the mob scattered…';
-    ctx.strokeText(title, VIEW_W / 2, 160);
-    ctx.fillStyle = won ? '#ffd166' : '#d8d0c8';
-    ctx.fillText(title, VIEW_W / 2, 160);
-    ctx.font = `italic 19px ${FONT}`;
+    const title = won ? '🌿 NATURE WINS 🌿' : 'THE PIPER GOT BONKED!';
+    ctx.strokeText(title, VIEW_W / 2, 150);
+    ctx.fillStyle = won ? '#ffd166' : '#ff8a8a';
+    ctx.fillText(title, VIEW_W / 2, 150);
+    if (!won) {
+      // Say exactly WHY the run ended and what to do about it.
+      ctx.font = `bold 19px ${FONT}`;
+      ctx.fillStyle = '#fff';
+      this.wrap(ctx, 'Your hearts ♥ ran out — the mob only marches for a standing piper.', VIEW_W / 2, 190, 700, 24);
+      ctx.font = `16px ${FONT}`;
+      ctx.fillStyle = '#c8e0b8';
+      this.wrap(ctx, `Next run: keep the robots off YOU. Whistle (${g.input.glyph(0, 'whistle')}) sends the mob at them; TO ME! (${g.input.glyph(0, 'recall')}) calls everyone back as bodyguards.`, VIEW_W / 2, 220, 720, 21);
+    }
+    ctx.font = `italic 17px ${FONT}`;
     ctx.fillStyle = '#e8e0d0';
-    this.wrap(ctx, this.endLine, VIEW_W / 2, 205, 640, 24);
+    this.wrap(ctx, this.endLine, VIEW_W / 2, won ? 200 : 268, 640, 22);
 
     ctx.font = `bold 19px ${FONT}`;
     ctx.fillStyle = '#fff';
     const s = g.runStats;
     const mins = Math.floor(s.time / 60), secs = Math.floor(s.time % 60);
-    ctx.fillText(`wave ${g.waveNum}/12 · ${s.bots} bots scrapped · biggest mob: ${g.mob.biggest} · 🌰 ${s.acorns} · ${mins}:${String(secs).padStart(2, '0')}`, VIEW_W / 2, 270);
+    ctx.fillText(`wave ${g.waveNum}/12 · ${s.bots} bots scrapped · biggest mob: ${g.mob.biggest} · 🌰 ${s.acorns} · ${mins}:${String(secs).padStart(2, '0')}`, VIEW_W / 2, won ? 252 : 322);
 
-    if (this.gUnlockY == null) this.gUnlockY = 0;
     if (g.newUnlocks && g.newUnlocks.length) {
       ctx.font = `bold 22px ${FONT}`;
       ctx.fillStyle = '#7ec850';
-      ctx.fillText(`🎉 NEW SPECIES UNLOCKED: ${g.newUnlocks.map(sp => SPECIES[sp].name).join(', ')}!`, VIEW_W / 2, 320);
+      ctx.fillText(`🎉 NEW SPECIES UNLOCKED: ${g.newUnlocks.map(sp => SPECIES[sp].name).join(', ')}!`, VIEW_W / 2, won ? 294 : 360);
     }
 
     // The mob takes a bow (or wanders off).

@@ -107,6 +107,43 @@ console.log('D) Whistle rally:');
   check(avgX2 >= avgX - 200, 'mob surged toward the rally and returns after release');
 }
 
+console.log('D2) TO ME! (recall = bodyguards):');
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  // Scatter the mob far away via a long whistle, then recall.
+  p.rally.x = p.x + 400; p.rally.y = p.y;
+  p.rallyT = 5;
+  for (let i = 0; i < 90; i++) g.frame(1 / 60);
+  p.rallyT = 0;
+  const avgD1 = g.mob.list.reduce((s, c) => s + Math.hypot(c.x - p.x, c.y - p.y), 0) / g.mob.count();
+  // Enemy breathing on the piper + recall pressed.
+  const bully = g.enemies.spawnNow(g, 'dustbot', p.x + 40, p.y);
+  const kxBefore = bully.kx;
+  g.input.keys.add('ShiftLeft');
+  g.frame(1 / 60);
+  g.input.keys.delete('ShiftLeft');
+  check(p.recallT > 0, 'TO ME! activates');
+  check(bully.kx > kxBefore, 'recall shoves nearby bots away from the piper');
+  for (let i = 0; i < 50; i++) g.frame(1 / 60);
+  const avgD2 = g.mob.list.reduce((s, c) => s + Math.hypot(c.x - p.x, c.y - p.y), 0) / g.mob.count();
+  check(avgD2 < avgD1 * 0.7, 'mob sprints back to the piper', `${avgD1.toFixed(0)} -> ${avgD2.toFixed(0)}`);
+}
+
+console.log('D3) Loss legibility:');
+{
+  const g = new Game(null);
+  g.input.assign(0, 'kb1');
+  g.startRun();
+  const p = g.players[0];
+  p.invuln = 0;
+  p.hurt(g, 1, null);
+  check(g.ui.dmgFlash > 0 && g.ui.dmgMsg.includes('♥'), 'piper hit triggers the big red callout', g.ui.dmgMsg);
+  check(g.ui.recallHintT > 0, 'first hit teaches TO ME!');
+}
+
 console.log('E) Crossroads:');
 {
   const g = new Game(null);

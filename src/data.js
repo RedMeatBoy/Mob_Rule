@@ -210,6 +210,8 @@ export const VICTORY_LINES = [
 export const TIPS = [
   'Critters follow the path YOU walk. Loop around enemies to surround them!',
   'Whistle (hold it!) to send the mob ahead. Let go and they come home.',
+  'Robots chasing YOU? Press TO ME! — the whole mob rushes back as bodyguards.',
+  'YOU are the health bar. If the piper falls, the parade is over.',
   'Three of the same critter MERGE into something bigger. Collect triples!',
   'Cages hold recruits. Walk over them. Free the friends.',
   'Bag-Bots steal critters — pop the bot, get your friend back.',

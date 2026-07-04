@@ -24,6 +24,7 @@ export class Piper {
     // Rally (whistle target).
     this.rally = { x, y };
     this.rallyT = 0;
+    this.recallT = 0;   // "TO ME!" — mob drops everything and bodyguards you
     this.whistleAnim = 0;
     // Trail: points every TRAIL_STEP px of movement; critters index into it.
     this.trail = [{ x, y }];
@@ -84,11 +85,28 @@ export class Piper {
     } else if (this.rallyT > 0) {
       this.rallyT -= dt;
     }
+    this.recallT = Math.max(0, this.recallT - dt);
     if (inp.recallP) {
+      // TO ME! — the mob sprints home and the arrival shoves bots away.
       this.rallyT = 0;
+      this.recallT = 1.4;
       game.audio.sfx('recall');
-      game.fx.ring(this.x, this.y, 60, '#aef2ff', 0.4);
-      game.fx.notes(this.x, this.y - 24, 4);
+      game.fx.ring(this.x, this.y, 90, '#aef2ff', 0.5);
+      game.fx.ring(this.x, this.y, 50, '#ffffff', 0.35);
+      game.fx.notes(this.x, this.y - 24, 6);
+      game.fx.num(this.x, this.y - 40, 'TO ME!', '#aef2ff', 16);
+      // Defensive shove: bots near the piper get pushed back.
+      // (Iterate the pool directly — the spatial grid is a frame stale.)
+      const EP = game.enemies.pool;
+      for (let i = 0; i < EP.n; i++) {
+        const e = EP.get(i);
+        if (e.dead || e.boss) continue;
+        const d = Math.hypot(e.x - this.x, e.y - this.y);
+        if (d > 120 || d < 0.01) continue;
+        e.kx += (e.x - this.x) / d * 260;
+        e.ky += (e.y - this.y) / d * 260;
+      }
+      game.shake(0.12);
     }
 
     // Charm aura (crossroads pick): nearby bots get dizzy.
@@ -104,6 +122,8 @@ export class Piper {
     game.audio.sfx('hurt');
     game.shake(0.3);
     game.fx.sparks(this.x, this.y, 6);
+    // Make piper damage IMPOSSIBLE to miss — the piper is the loss condition.
+    game.ui.piperHit(this);
     if (src) {
       const dx = this.x - src.x, dy = this.y - src.y;
       const d = Math.hypot(dx, dy) || 1;
@@ -196,6 +216,18 @@ export class Piper {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(x, y + 13, 15, 6, 0, 0, 6.29); ctx.stroke();
     ctx.globalAlpha = 1;
+
+    // Hearts float over the piper's head — health lives where the eyes are.
+    const hn = Math.min(this.maxHearts, 7);
+    const hw = hn * 9;
+    for (let h = 0; h < hn; h++) {
+      const filled = h < this.hearts;
+      const lastPulse = this.hearts === 1 && filled ? 1 + Math.sin(game.time * 10) * 0.3 : 1;
+      ctx.font = `${Math.round(9 * lastPulse)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = filled ? (this.hearts === 1 ? '#ff5c5c' : this.color) : 'rgba(20,30,15,0.45)';
+      ctx.fillText('♥', x - hw / 2 + h * 9 + 4, y - 36);
+    }
     if (this.little) {
       ctx.fillStyle = '#ffd966';
       ctx.font = 'bold 10px sans-serif';

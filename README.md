@@ -22,13 +22,16 @@ believe animals are clutter. Prove them extremely wrong.
 |---|---|---|---|
 | Walk | `WASD` | Arrows | Left stick |
 | **Whistle** (hold — sends the mob ahead) | `Space` | `Enter` | **A** |
-| Recall (mob comes home) | `Shift` | `RShift` | **B** |
+| **TO ME!** (mob rushes back to defend you) | `Shift` | `RShift` | **B** |
 | Pause | `Esc` | `Esc` | **Start** |
 | Mute | `M` | `M` | **View** |
 
-That's it. The mob follows your footsteps and fights automatically. Your only
-jobs: don't get cornered, walk over **cages** to free recruits, and whistle
-the swarm at whatever deserves it.
+That's it. The mob follows your footsteps and fights automatically.
+
+**⚠️ YOU are the health bar.** The robots win by bonking the *piper*, not the
+mob — so keep them off you. Whistle sends your swarm at them; **TO ME!** pulls
+everyone back around you as bodyguards (with a shove for anything too close).
+Walk over **cages** to free recruits, and never stop moving.
 
 ## 🐾 The rules of the mob
 

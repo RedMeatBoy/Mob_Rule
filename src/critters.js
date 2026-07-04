@@ -154,26 +154,43 @@ export class MobSystem {
       const def = SPECIES[c.sp];
       const spd = statFor(c.sp, c.tier, 'speed') * (1 + this.buffs.speed);
 
+      // ---- TO ME! overrides everything: sprint home, guard the piper ----
+      let recalled = false;
+      if (piper.recallT > 0) {
+        recalled = true;
+        c.target = null;
+        const dx = piper.x - c.x, dy = piper.y - c.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 34) {
+          c.vx = (dx / d) * spd * 1.9;
+          c.vy = (dy / d) * spd * 1.9;
+        } else { c.vx *= 0.7; c.vy *= 0.7; }
+      }
+
       // ---- target acquisition ----
-      const sent = piper.rallyT > 0;
+      const sent = !recalled && piper.rallyT > 0;
       const anchor = sent ? piper.rally : { x: c.x, y: c.y };
       const seekR = sent ? SENT_AGGRO : AGGRO;
-      if (!c.target || c.target.dead) {
-        c.target = null;
-        if (def.role !== 'heal') {
-          c.target = game.enemies.nearest(anchor.x, anchor.y, seekR)
-            || (sent ? game.enemies.nearest(c.x, c.y, AGGRO) : null);
+      if (!recalled) {
+        if (!c.target || c.target.dead) {
+          c.target = null;
+          if (def.role !== 'heal') {
+            c.target = game.enemies.nearest(anchor.x, anchor.y, seekR)
+              || (sent ? game.enemies.nearest(c.x, c.y, AGGRO) : null);
+          }
+        } else if (!sent && dist2(c.target.x, c.target.y, piper.x, piper.y) > LEASH * LEASH) {
+          c.target = null; // don't chase to the next county
         }
-      } else if (!sent && dist2(c.target.x, c.target.y, piper.x, piper.y) > LEASH * LEASH) {
-        c.target = null; // don't chase to the next county
       }
 
       // ---- role behaviors ----
-      let moved = false;
-      if (def.role === 'heal') {
-        moved = this.behaveHealer(c, dt, game, piper, spd);
-      } else if (c.target) {
-        moved = this.behaveCombat(c, dt, game, def, spd);
+      let moved = recalled;
+      if (!recalled) {
+        if (def.role === 'heal') {
+          moved = this.behaveHealer(c, dt, game, piper, spd);
+        } else if (c.target) {
+          moved = this.behaveCombat(c, dt, game, def, spd);
+        }
       }
 
       if (!moved) {
